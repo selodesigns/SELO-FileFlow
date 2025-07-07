@@ -261,32 +261,6 @@ class FileFlowMainWindow(QMainWindow):
             self.category_extensions[cat] = new_exts
             self.statusbar.showMessage(f'Extensions for {cat} updated: {", ".join(sorted(new_exts))}', 3000)
 
-        # Custom Mappings Tab
-        mappings_tab = QWidget()
-        mappings_layout = QVBoxLayout()
-        mappings_layout.addWidget(QLabel('<b>Custom Extension-to-Folder Mappings:</b>'))
-        self.mappings_list = QListWidget()
-        self.custom_mappings = []  # List of (extension, folder)
-        # For demo, load from config if present
-        config_mappings = config.get('custom_mappings', [])
-        for mapping in config_mappings:
-            ext = mapping.get('extension', '')
-            folder = mapping.get('folder', '')
-            self.mappings_list.addItem(QListWidgetItem(f'.{ext} → {folder}'))
-            self.custom_mappings.append((ext, folder))
-        mappings_layout.addWidget(self.mappings_list)
-        btn_add_map = QPushButton('Add Mapping')
-        btn_add_map.clicked.connect(self.add_mapping)
-        btn_remove_map = QPushButton('Remove Selected Mapping')
-        btn_remove_map.clicked.connect(self.remove_selected_mapping)
-        btn_edit_map = QPushButton('Edit Selected Mapping')
-        btn_edit_map.clicked.connect(self.edit_selected_mapping)
-        mappings_layout.addWidget(btn_add_map)
-        mappings_layout.addWidget(btn_remove_map)
-        mappings_layout.addWidget(btn_edit_map)
-        mappings_tab.setLayout(mappings_layout)
-        tabs.addTab(mappings_tab, 'Custom Mappings')
-
         # Settings Tab
         settings_tab = QWidget()
         settings_layout = QVBoxLayout()
