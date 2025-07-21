@@ -1,0 +1,4132 @@
+Script Compilation created on Tue 05/27/2025 at  8:23:08.81 
+Source directory: E:\GitHub\SELO-FileFlow\ 
+================================================================= 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: build_app.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 2434 bytes 
+LAST MODIFIED: 05/24/2025 04:41 PM 
+----------------------------------------------------------------- 
+ 
+#!/usr/bin/env python3
+"""
+Simplified build script for SELO FileFlow.
+Creates a standalone executable using PyInstaller directly.
+"""
+
+import os
+import sys
+import shutil
+import subprocess
+from pathlib import Path
+
+def build_executable():
+    """Build the executable package for SELO FileFlow."""
+    print("Building SELO FileFlow executable...")
+
+    # Ensure PyInstaller is installed
+    try:
+        import PyInstaller
+    except ImportError:
+        print("PyInstaller not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+
+    # Prepare directories
+    build_dir = Path("build")
+    dist_dir = Path("dist")
+    resources_dir = Path("resources")
+    icon_path = resources_dir / "icon.ico"
+
+    # Clean build and dist folders
+    for dir_path in [build_dir, dist_dir]:
+        if dir_path.exists():
+            try:
+                shutil.rmtree(str(dir_path))
+            except PermissionError as e:
+                print(f"Warning: Could not completely clean {dir_path} - some files may be in use.\n{e}")
+        dir_path.mkdir(exist_ok=True)
+
+    # Ensure resources/icon.ico exists
+    if not resources_dir.exists():
+        resources_dir.mkdir(exist_ok=True)
+    if not icon_path.exists() or icon_path.stat().st_size == 0:
+        print("Creating placeholder icon file...")
+        icon_path.touch()
+
+    # Ensure LICENSE exists
+    license_file = Path("LICENSE")
+    if not license_file.exists():
+        print("Creating LICENSE file...")
+        with open(license_file, "w") as f:
+            f.write("MIT License\n\nCopyright (c) 2025 SELOdev\n\nPermission is hereby granted...")
+
+    # PyInstaller build command
+    print("Running PyInstaller...")
+    cmd = [
+        sys.executable,
+        "-m", "PyInstaller",
+        "run_fileflow.py",
+        "--name=SELO-FileFlow",
+        "--windowed",
+        "--clean",
+        "--noconfirm",
+        f"--add-data=config{os.pathsep}config",
+        f"--add-data=LICENSE{os.pathsep}.",
+        f"--icon={icon_path}"
+    ]
+
+    try:
+        subprocess.check_call(cmd)
+        exe_path = os.path.abspath("dist/SELO-FileFlow/SELO-FileFlow.exe")
+        print(f"\n✅ Build completed successfully!")
+        print(f"Executable available at: {exe_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error building executable: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    build_executable()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: build_installer.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 14351 bytes 
+LAST MODIFIED: 05/25/2025 09:21 PM 
+----------------------------------------------------------------- 
+ 
+#!/usr/bin/env python3
+"""
+Build script for SELO FileFlow.
+Creates a standalone executable using PyInstaller.
+"""
+
+import os
+import sys
+import shutil
+import subprocess
+from pathlib import Path
+
+def build_executable():
+    """Build the executable package for SELO FileFlow."""
+    print("Building SELO FileFlow executable...")
+    
+    # Ensure PyInstaller is installed
+    try:
+        import PyInstaller
+    except ImportError:
+        print("PyInstaller not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+    
+    # Prepare build directory
+    build_dir = Path("build")
+    dist_dir = Path("dist")
+    
+    for dir_path in [build_dir, dist_dir]:
+        if dir_path.exists():
+            shutil.rmtree(dir_path)
+        dir_path.mkdir()
+    
+    # Check for required files and create them if missing
+    license_file = Path("LICENSE")
+    if not license_file.exists():
+        print("Creating default LICENSE file...")
+        with open(license_file, "w") as f:
+            f.write("MIT License\n\nCopyright (c) 2025 SELOdev\n\nPermission is hereby granted...")
+    
+    readme_file = Path("README.md")
+    if not readme_file.exists():
+        print("Creating default README.md file...")
+        with open(readme_file, "w") as f:
+            f.write("# SELO FileFlow\n\nA professional file management solution from SELOdev.")
+    
+    # Create a simple icon if not exists
+    icon_path = Path("resources/icon.ico")
+    if not icon_path.exists() or os.path.getsize(str(icon_path)) == 0:
+        print("Creating placeholder icon...")
+        # We'll just create an empty file as placeholder
+        icon_path.parent.mkdir(exist_ok=True)
+        icon_path.touch()
+    
+    # Convert to string with proper escaping for spec file
+    icon_path_str = str(icon_path).replace('\\', '/')
+    
+    # Collect data files that actually exist
+    data_files = []
+    
+    # Always include config directory
+    if Path("config").exists():
+        data_files.append(("config", "config"))
+    
+    # Add other files if they exist
+    for file in ["README.md", "LICENSE"]:
+        if Path(file).exists():
+            data_files.append((file, "."))
+            
+    # Always include the icon file
+    icon_file = Path("resources/icon.ico")
+    if icon_file.exists():
+        data_files.append((str(icon_file), "resources"))
+        # Also copy it to the root for PyInstaller to find
+        data_files.append((str(icon_file), "."))
+    
+    # Create the icon_hook.py if it doesn't exist
+    icon_hook_path = Path("icon_hook.py")
+    if not icon_hook_path.exists():
+        with open(icon_hook_path, "w") as f:
+            f.write('"""PyInstaller runtime hook for proper icon handling."""\n')
+            f.write('# This file is intentionally empty as icon handling is now in ui_app.py\n')
+    
+    # Create the user_dirs_hook.py if it doesn't exist
+    user_dirs_hook_path = Path("user_dirs_hook.py")
+    if not user_dirs_hook_path.exists():
+        with open(user_dirs_hook_path, "w") as f:
+            f.write('"""\nPyInstaller hook for SELO FileFlow.\n')
+            f.write('This runtime hook ensures proper handling of user directories when running as a packaged application.\n')
+            f.write('"""\n')
+            f.write('import os\n')
+            f.write('import sys\n')
+            f.write('from pathlib import Path\n\n')
+            f.write('# This will run before the application starts\n')
+            f.write('def setup_user_directories():\n')
+            f.write('    """Set up user-specific directories for the packaged application."""\n')
+            f.write('    try:\n')
+            f.write('        # Check if running as a packaged application\n')
+            f.write('        is_frozen = getattr(sys, \'frozen\', False) and hasattr(sys, \'_MEIPASS\')\n\n')
+            f.write('        if is_frozen:\n')
+            f.write('            # Determine base user directory for data\n')
+            f.write('            if sys.platform == \'win32\':\n')
+            f.write('                # Windows: Use AppData\n')
+            f.write('                base_user_dir = Path(os.environ.get(\'APPDATA\', \'\')) / "SELOdev" / "FileFlow"\n')
+            f.write('            else:\n')
+            f.write('                # Unix/Linux/Mac: Use ~/.fileflow\n')
+            f.write('                base_user_dir = Path(os.path.expanduser("~")) / ".fileflow"\n\n')
+            f.write('            # Create user directories if they don\'t exist\n')
+            f.write('            for dir_name in [\'config\', \'logs\', \'data\', \'cache\']:\n')
+            f.write('                dir_path = base_user_dir / dir_name\n')
+            f.write('                dir_path.mkdir(parents=True, exist_ok=True)\n')
+            f.write('    except Exception:\n')
+            f.write('        # Don\'t let errors in this hook prevent the application from starting\n')
+            f.write('        pass\n\n')
+            f.write('# Run the setup\n')
+            f.write('setup_user_directories()\n')
+
+    # Build spec file content with dynamic data files - simpler approach without Path dependency
+    spec_content = f"""# -*- mode: python ; coding: utf-8 -*-
+import os
+from pathlib import Path
+
+block_cipher = None
+
+a = Analysis(
+    ['run_fileflow.py'],
+    pathex=[],
+    binaries=[],
+    datas={data_files},
+    hiddenimports=['PyQt5.sip'],
+    hookspath=[],
+    hooksconfig={{}},
+    runtime_hooks=['icon_hook.py', 'user_dirs_hook.py'],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='SELO-FileFlow',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon='{icon_path_str}' if os.path.exists('{icon_path_str}') else None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='SELO-FileFlow',
+)
+    """
+    
+    # Create resources directory and placeholder icon
+    resources_dir = Path("resources")
+    if not resources_dir.exists():
+        resources_dir.mkdir()
+    
+    # Create a spec file
+    with open("SELO-FileFlow.spec", "w") as f:
+        f.write(spec_content)
+    
+    # Run PyInstaller
+    print("Running PyInstaller...")
+    subprocess.check_call([
+        sys.executable, 
+        "-m", 
+        "PyInstaller", 
+        "SELO-FileFlow.spec",
+        "--noconfirm"
+    ])
+    
+    # Create installer with NSIS (if available)
+    try:
+        create_windows_installer()
+    except Exception as e:
+        print(f"Skipping Windows installer creation: {e}")
+        print("You can still use the standalone executable in the dist folder.")
+    
+    print("\nBuild completed!")
+    print(f"Executable available at: {os.path.abspath('dist/SELO-FileFlow/SELO-FileFlow.exe')}")
+
+def create_windows_installer():
+    """Create a Windows installer using NSIS."""
+    # Check for makensis in common installation locations
+    makensis_cmd = "makensis"
+    nsis_found = False
+    
+    # First try with the command directly (if in PATH)
+    try:
+        subprocess.check_call([makensis_cmd, "-VERSION"], 
+                             stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL)
+        nsis_found = True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        # Not in PATH, try common installation locations
+        common_paths = [
+            "C:\\Program Files\\NSIS\\makensis.exe",
+            "C:\\Program Files (x86)\\NSIS\\makensis.exe",
+            os.path.expandvars("%ProgramFiles%\\NSIS\\makensis.exe"),
+            os.path.expandvars("%ProgramFiles(x86)%\\NSIS\\makensis.exe")
+        ]
+        
+        for path in common_paths:
+            if os.path.exists(path):
+                makensis_cmd = path
+                nsis_found = True
+                print(f"NSIS found at: {path}")
+                break
+    
+    if not nsis_found:
+        print("NSIS not found. Skipping installer creation.")
+        print("To create an installer, install NSIS from https://nsis.sourceforge.io/")
+        return
+    
+    # Get version info
+    version = "1.0.0"  # Default version
+    try:
+        # Try to read version from a version file if it exists
+        if Path("version.txt").exists():
+            with open("version.txt", "r") as f:
+                version = f.read().strip()
+    except Exception:
+        pass
+    
+    # Let's create a complete installer.nsi file separately instead of using Python string formatting
+    # Define version for the filename only
+    installer_filename = f"FileFlow-Setup-{version}.exe"
+    
+    # NSIS script with the version manually inserted where needed
+    nsis_script = f"""
+; SELO FileFlow Installer Script
+!include "MUI2.nsh"
+!include "FileFunc.nsh"
+
+; General
+Name "FileFlow"
+OutFile "{installer_filename}"
+InstallDir "$PROGRAMFILES\\SELOdev\\FileFlow"
+InstallDirRegKey HKCU "Software\\SELOdev\\FileFlow" ""
+
+; Request application privileges
+RequestExecutionLevel admin
+
+; Add version info to installer
+VIProductVersion "{version}.0"
+VIAddVersionKey "ProductName" "SELO FileFlow"
+VIAddVersionKey "CompanyName" "SELOdev"
+VIAddVersionKey "LegalCopyright" "© 2025 SELOdev"
+VIAddVersionKey "FileDescription" "SELO FileFlow Installer"
+VIAddVersionKey "FileVersion" "{version}"
+VIAddVersionKey "ProductVersion" "{version}"
+
+; Interface settings
+!define MUI_ABORTWARNING
+!define MUI_ICON "resources\\icon.ico"
+!define MUI_UNICON "resources\\icon.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "resources\\installer-header.bmp"
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_FINISHPAGE_RUN "$INSTDIR\\SELO-FileFlow.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch FileFlow"
+
+; Pages
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_DIRECTORY
+
+; Component selection page
+!insertmacro MUI_PAGE_COMPONENTS
+
+
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+; Languages
+!insertmacro MUI_LANGUAGE "English"
+
+; Installation Options
+Section "FileFlow (Required)" SecMain
+  SectionIn RO  ; Read-only, cannot be deselected
+  SetOutPath "$INSTDIR"
+  
+  ; Files
+  File /r "dist\\SELO-FileFlow\\*.*"
+  
+  ; Create logs directory in user's AppData folder (writable by non-admin users)
+  CreateDirectory "$APPDATA\\SELOdev\\FileFlow\\logs"
+  
+  ; Set an environment variable for the app to use for logging
+  WriteRegStr HKCU "Environment" "FILEFLOW_LOG_DIR" "$APPDATA\\SELOdev\\FileFlow\\logs"
+  
+  ; Registry keys for uninstaller
+  WriteRegStr HKCU "Software\\SELOdev\\FileFlow" "" $INSTDIR
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayName" "FileFlow"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "UninstallString" '"$INSTDIR\\uninstall.exe"'
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "Publisher" "SELOdev"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayIcon" "$INSTDIR\\SELO-FileFlow.exe"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayVersion" "{version}"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "InstallLocation" "$INSTDIR"
+  
+  ; Get installation size
+  ${{GetSize}} "$INSTDIR" "/S=0K" $0 $1 $2
+  IntFmt $0 "0x%08X" $0
+  WriteRegDWORD HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "EstimatedSize" $0
+  
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+; Desktop shortcut (checked by default)
+Section "Desktop Shortcut" SecDesktop
+  ; First ensure the icon is properly copied to a known location
+  SetOutPath "$INSTDIR"
+  File /oname=app.ico "resources\\icon.ico"
+  CreateShortcut "$DESKTOP\\FileFlow.lnk" "$INSTDIR\\SELO-FileFlow.exe" "" "$INSTDIR\\app.ico"
+SectionEnd
+
+; Start Menu shortcuts (checked by default)
+Section "Start Menu Shortcuts" SecStartMenu
+  CreateDirectory "$SMPROGRAMS\\SELOdev"
+  CreateShortcut "$SMPROGRAMS\\SELOdev\\FileFlow.lnk" "$INSTDIR\\SELO-FileFlow.exe" "" "$INSTDIR\\app.ico"
+  CreateShortcut "$SMPROGRAMS\\SELOdev\\Uninstall FileFlow.lnk" "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+; Run at startup option
+Section "Run at Startup" SecStartup
+  WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "FileFlow" "$INSTDIR\\SELO-FileFlow.exe --minimized"
+SectionEnd
+
+; Description texts for sections
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecMain}} "Core application files (required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecDesktop}} "Create a shortcut on your desktop"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartMenu}} "Create shortcuts in your Start Menu"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartup}} "Automatically start FileFlow when Windows starts"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+    """
+    
+    # Write NSIS script to file
+    with open("installer.nsi", "w") as f:
+        f.write(nsis_script)
+    
+    # Run NSIS to create installer
+    print("Creating Windows installer with NSIS...")
+    subprocess.check_call([makensis_cmd, "installer.nsi"])
+    
+    # Check for installer with dynamic filename
+    installer_file = f"FileFlow-Setup-{version}.exe"
+    if os.path.exists(installer_file):
+        # Create dist directory if it doesn't exist
+        if not os.path.exists("dist"):
+            os.makedirs("dist")
+        shutil.move(installer_file, f"dist/{installer_file}")
+        print(f"Installer created at: {os.path.abspath(f'dist/{installer_file}')}")
+    else:
+        print(f"Warning: Expected installer file {installer_file} not found after NSIS compilation.")
+
+if __name__ == "__main__":
+    build_executable()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: convert_icon.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 1130 bytes 
+LAST MODIFIED: 05/24/2025 03:22 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Convert PNG to ICO format for FileFlow application.
+"""
+from PIL import Image
+import os
+from pathlib import Path
+
+def convert_png_to_ico():
+    """Convert PNG to ICO format with multiple sizes for Windows."""
+    png_path = Path("resources/icon.png")
+    ico_path = Path("resources/icon.ico")
+    
+    if not png_path.exists():
+        print(f"Error: {png_path} not found!")
+        return False
+    
+    try:
+        # Open the PNG image
+        img = Image.open(png_path)
+        
+        # Create a set of images with different sizes
+        sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+        
+        # The first image will be used as the base for the .ico file
+        # Generate all sizes and save as ICO
+        print(f"Converting {png_path} to {ico_path} with sizes: {sizes}")
+        img.save(ico_path, format='ICO', sizes=[(x, y) for x, y in sizes])
+        
+        print(f"Successfully created {ico_path}")
+        return True
+    
+    except Exception as e:
+        print(f"Error converting PNG to ICO: {e}")
+        return False
+
+if __name__ == "__main__":
+    convert_png_to_ico()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: create_fileflow_installer.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 8184 bytes 
+LAST MODIFIED: 05/24/2025 03:29 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Create a FileFlow installer (freeware edition).
+"""
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+def create_windows_installer():
+    """Create a Windows installer for FileFlow freeware."""
+    # Check if the executable exists
+    exe_path = Path("dist") / "SELO-FileFlow" / "SELO-FileFlow.exe"
+    if not exe_path.exists():
+        print(f"Error: Executable not found at {exe_path}")
+        print("Please run build_app.py first to create the executable.")
+        return False
+        
+    # Get version info
+    version = "1.0.0"  # Default version
+    try:
+        # Try to read version from a version file if it exists
+        if Path("version.txt").exists():
+            with open("version.txt", "r") as f:
+                version = f.read().strip()
+    except Exception:
+        pass
+    
+    print(f"Creating installer for FileFlow version {version}...")
+    
+    # Create NSIS script
+    nsis_script = f"""
+; FileFlow Installer Script (Freeware Edition)
+!include "MUI2.nsh"
+!include "FileFunc.nsh"
+
+; General
+Name "FileFlow"
+OutFile "FileFlow-Setup-{version}.exe"
+InstallDir "$PROGRAMFILES\\FileFlow"
+InstallDirRegKey HKCU "Software\\FileFlow" ""
+
+; Add version info to installer
+VIProductVersion "{version}.0"
+VIAddVersionKey "ProductName" "FileFlow"
+VIAddVersionKey "CompanyName" "SELOdev"
+VIAddVersionKey "LegalCopyright" "© 2025 SELOdev"
+VIAddVersionKey "FileDescription" "FileFlow Installer"
+VIAddVersionKey "FileVersion" "{version}"
+VIAddVersionKey "ProductVersion" "{version}"
+
+; Interface settings
+!define MUI_ABORTWARNING
+!define MUI_ICON "resources\\icon.ico"
+!define MUI_UNICON "resources\\icon.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "resources\\installer-header.bmp"
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_FINISHPAGE_RUN "$INSTDIR\\FileFlow.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch FileFlow"
+
+; Pages
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_DIRECTORY
+
+; Component selection page
+!insertmacro MUI_PAGE_COMPONENTS
+
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+; Languages
+!insertmacro MUI_LANGUAGE "English"
+
+; Installation Options
+Section "FileFlow (Required)" SecMain
+  SectionIn RO  ; Read-only, cannot be deselected
+  SetOutPath "$INSTDIR"
+  
+  ; Files
+  File /r "dist\\SELO-FileFlow\\*.*"
+  
+  ; Rename the executable
+  Rename "$INSTDIR\\SELO-FileFlow.exe" "$INSTDIR\\FileFlow.exe"
+  
+  ; Create important directories if they don't exist
+  CreateDirectory "$INSTDIR\\logs"
+  
+  ; Registry keys for uninstaller
+  WriteRegStr HKCU "Software\\FileFlow" "" $INSTDIR
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayName" "FileFlow"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "UninstallString" "$\\"$INSTDIR\\uninstall.exe$\\""
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "Publisher" "SELOdev"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayIcon" "$INSTDIR\\FileFlow.exe"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "DisplayVersion" "{version}"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "InstallLocation" "$INSTDIR"
+  
+  ; Get installation size
+  ${{GetSize}} "$INSTDIR" "/S=0K" $0 $1 $2
+  IntFmt $0 "0x%08X" $0
+  WriteRegDWORD HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow" "EstimatedSize" "$0"
+  
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+; Optional Sections
+Section "Desktop Shortcut" SecDesktop
+  ; Create desktop shortcut with explicit icon
+  File "/oname=$INSTDIR\\icon.ico" "resources\\icon.ico"
+  CreateShortcut "$DESKTOP\\FileFlow.lnk" "$INSTDIR\\FileFlow.exe" "" "$INSTDIR\\icon.ico"
+SectionEnd
+
+Section "Start Menu Shortcuts" SecStartMenu
+  CreateDirectory "$SMPROGRAMS\\FileFlow"
+  CreateShortcut "$SMPROGRAMS\\FileFlow\\FileFlow.lnk" "$INSTDIR\\FileFlow.exe" "" "$INSTDIR\\icon.ico"
+  CreateShortcut "$SMPROGRAMS\\FileFlow\\Uninstall FileFlow.lnk" "$INSTDIR\\uninstall.exe" "" "$INSTDIR\\icon.ico"
+SectionEnd
+
+Section "Run at Startup" SecStartup
+  WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "FileFlow" "$INSTDIR\\FileFlow.exe --minimized"
+SectionEnd
+
+; Descriptions for sections
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecMain}} "Core application files (required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecDesktop}} "Create a shortcut on your desktop"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartMenu}} "Create shortcuts in your Start Menu"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartup}} "Automatically start FileFlow when Windows starts"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+; Uninstaller section
+Section "Uninstall"
+  ; Remove files and directories
+  RMDir /r "$INSTDIR\\*.*"
+  RMDir "$INSTDIR"
+  
+  ; Remove shortcuts
+  Delete "$SMPROGRAMS\\FileFlow\\FileFlow.lnk"
+  Delete "$SMPROGRAMS\\FileFlow\\Uninstall FileFlow.lnk"
+  RMDir "$SMPROGRAMS\\FileFlow" 
+  Delete "$DESKTOP\\FileFlow.lnk"
+  
+  ; Remove registry keys
+  DeleteRegKey HKCU "Software\\FileFlow"
+  DeleteRegKey HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FileFlow"
+  DeleteRegValue HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "FileFlow"
+SectionEnd
+"""
+
+    # Write NSIS script to file
+    print("Creating NSIS installer script...")
+    with open("installer.nsi", "w") as f:
+        f.write(nsis_script)
+    
+    # Check if makensis is available
+    try:
+        # Try to find makensis in the default NSIS installation directory
+        nsis_paths = [
+            r"C:\Program Files\NSIS\makensis.exe",
+            r"C:\Program Files (x86)\NSIS\makensis.exe"
+        ]
+        
+        makensis_path = None
+        for path in nsis_paths:
+            if os.path.exists(path):
+                makensis_path = path
+                break
+        
+        if makensis_path:
+            print(f"Found NSIS at: {makensis_path}")
+        else:
+            # Try to run makensis directly (if it's in PATH)
+            subprocess.check_call(["makensis", "-VERSION"], 
+                                 stdout=subprocess.PIPE, 
+                                 stderr=subprocess.PIPE)
+            makensis_path = "makensis"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        print("NSIS not found. Please check your NSIS installation.")
+        print("You can download NSIS from https://nsis.sourceforge.io/")
+        return False
+    
+    # Run NSIS to create installer
+    print("Creating Windows installer with NSIS...")
+    try:
+        if makensis_path == "makensis":
+            subprocess.check_call(["makensis", "installer.nsi"])
+        else:
+            subprocess.check_call([makensis_path, "installer.nsi"])
+        
+        # Check if installer was created
+        installer_path = f"FileFlow-Setup-{version}.exe"
+        if os.path.exists(installer_path):
+            print(f"Installer created successfully: {os.path.abspath(installer_path)}")
+            
+            # Move installer to dist directory
+            dist_path = os.path.join("dist", installer_path)
+            if not os.path.exists("dist"):
+                os.makedirs("dist")
+            
+            # Move to dist folder
+            os.replace(installer_path, dist_path)
+            print(f"Installer moved to: {os.path.abspath(dist_path)}")
+            return True
+        else:
+            print(f"Error: Installer not found at {installer_path}")
+            return False
+    except subprocess.SubprocessError as e:
+        print(f"Error running NSIS: {e}")
+        return False
+
+if __name__ == "__main__":
+    if create_windows_installer():
+        print("Installer creation completed successfully!")
+    else:
+        print("Failed to create installer.")
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: create_icon.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 2258 bytes 
+LAST MODIFIED: 05/24/2025 11:48 AM 
+----------------------------------------------------------------- 
+ 
+"""
+Create a simple icon file for SELO FileFlow.
+"""
+from PIL import Image
+import os
+
+def create_icon():
+    # Create a blue gradient icon
+    width, height = 256, 256
+    
+    # Create a new image with a blue gradient
+    image = Image.new('RGBA', (width, height))
+    
+    # Generate a blue gradient
+    for y in range(height):
+        for x in range(width):
+            # Create a blue gradient from top to bottom
+            r = int(73 * (1 - y/height))  # Darker at the bottom
+            g = int(109 + (146-109) * (1 - y/height))
+            b = int(137 + (220-137) * (1 - y/height))
+            image.putpixel((x, y), (r, g, b, 255))
+    
+    # Draw 'SF' text (simplified)
+    for y in range(75, 200):
+        for x in range(75, 105):
+            # Draw vertical line for 'S'
+            image.putpixel((x, y), (255, 255, 255, 255))
+        for x in range(150, 180):
+            # Draw vertical line for 'F'
+            image.putpixel((x, y), (255, 255, 255, 255))
+            
+    # Draw horizontal lines for 'S'
+    for x in range(75, 180):
+        for y in range(75, 95):
+            image.putpixel((x, y), (255, 255, 255, 255))
+        for y in range(130, 150):
+            image.putpixel((x, y), (255, 255, 255, 255))
+        for y in range(180, 200):
+            image.putpixel((x, y), (255, 255, 255, 255))
+    
+    # Draw horizontal line for 'F'
+    for x in range(150, 200):
+        for y in range(75, 95):
+            image.putpixel((x, y), (255, 255, 255, 255))
+        for y in range(130, 150):
+            image.putpixel((x, y), (255, 255, 255, 255))
+    
+    # Save as PNG first
+    png_path = os.path.join('resources', 'icon.png')
+    image.save(png_path)
+    print(f"PNG icon saved to {png_path}")
+    
+    # Save as ICO with multiple sizes
+    ico_path = os.path.join('resources', 'icon.ico')
+    # Create multi-resolution icon
+    sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+    resized_images = [image.resize(size) for size in sizes]
+    
+    # The first image will be used as the base for the .ico file
+    resized_images[0].save(ico_path, format='ICO', sizes=[(img.width, img.height) for img in resized_images])
+    print(f"ICO icon saved to {ico_path}")
+
+if __name__ == "__main__":
+    create_icon()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: create_installer.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 8110 bytes 
+LAST MODIFIED: 05/24/2025 11:52 AM 
+----------------------------------------------------------------- 
+ 
+"""
+Create an NSIS installer for SELO FileFlow using an existing executable.
+"""
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+def create_windows_installer():
+    """Create a Windows installer using NSIS."""
+    # Check if the executable exists
+    exe_path = Path("dist") / "SELO-FileFlow" / "SELO-FileFlow.exe"
+    if not exe_path.exists():
+        print(f"Error: Executable not found at {exe_path}")
+        print("Please run build_app.py first to create the executable.")
+        return False
+        
+    # Get version info
+    version = "1.0.0"  # Default version
+    try:
+        # Try to read version from a version file if it exists
+        if Path("version.txt").exists():
+            with open("version.txt", "r") as f:
+                version = f.read().strip()
+    except Exception:
+        pass
+    
+    print(f"Creating installer for SELO FileFlow version {version}...")
+    
+    # Create NSIS script
+    nsis_script = f"""
+; SELO FileFlow Installer Script
+!include "MUI2.nsh"
+!include "FileFunc.nsh"
+
+; General
+Name "SELO FileFlow"
+OutFile "SELO-FileFlow-Setup-{version}.exe"
+InstallDir "$PROGRAMFILES\\SELOdev\\SELO FileFlow"
+InstallDirRegKey HKCU "Software\\SELOdev\\SELO FileFlow" ""
+
+; Add version info to installer
+VIProductVersion "{version}.0"
+VIAddVersionKey "ProductName" "SELO FileFlow"
+VIAddVersionKey "CompanyName" "SELOdev"
+VIAddVersionKey "LegalCopyright" "© 2025 SELOdev"
+VIAddVersionKey "FileDescription" "SELO FileFlow Installer"
+VIAddVersionKey "FileVersion" "{version}"
+VIAddVersionKey "ProductVersion" "{version}"
+
+; Interface settings
+!define MUI_ABORTWARNING
+!define MUI_ICON "resources\\icon.ico"
+!define MUI_UNICON "resources\\icon.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "resources\\installer-side.bmp"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "resources\\installer-header.bmp"
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_FINISHPAGE_RUN "$INSTDIR\\SELO-FileFlow.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch SELO FileFlow"
+
+; Pages
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_DIRECTORY
+
+; Component selection page
+!insertmacro MUI_PAGE_COMPONENTS
+
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+; Languages
+!insertmacro MUI_LANGUAGE "English"
+
+; Installation Options
+Section "SELO FileFlow (Required)" SecMain
+  SectionIn RO  ; Read-only, cannot be deselected
+  SetOutPath "$INSTDIR"
+  
+  ; Files
+  File /r "dist\\SELO-FileFlow\\*.*"
+  
+  ; Create important directories if they don't exist
+  CreateDirectory "$INSTDIR\\logs"
+  
+  ; Registry keys for uninstaller
+  WriteRegStr HKCU "Software\\SELOdev\\SELO FileFlow" "" $INSTDIR
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "DisplayName" "SELO FileFlow"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "UninstallString" "$\\"$INSTDIR\\uninstall.exe$\\""
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "Publisher" "SELOdev"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "DisplayIcon" "$INSTDIR\\SELO-FileFlow.exe"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "DisplayVersion" "{version}"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "InstallLocation" "$INSTDIR"
+  
+  ; Get installation size
+  ${{GetSize}} "$INSTDIR" "/S=0K" $0 $1 $2
+  IntFmt $0 "0x%08X" $0
+  WriteRegDWORD HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow" "EstimatedSize" "$0"
+  
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+; Optional Sections
+Section "Desktop Shortcut" SecDesktop
+  CreateShortcut "$DESKTOP\\SELO FileFlow.lnk" "$INSTDIR\\SELO-FileFlow.exe"
+SectionEnd
+
+Section "Start Menu Shortcuts" SecStartMenu
+  CreateDirectory "$SMPROGRAMS\\SELOdev"
+  CreateShortcut "$SMPROGRAMS\\SELOdev\\SELO FileFlow.lnk" "$INSTDIR\\SELO-FileFlow.exe"
+  CreateShortcut "$SMPROGRAMS\\SELOdev\\Uninstall SELO FileFlow.lnk" "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+Section "Run at Startup" SecStartup
+  WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "SELOFileFlow" "$INSTDIR\\SELO-FileFlow.exe --minimized"
+SectionEnd
+
+; Descriptions for sections
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecMain}} "Core application files (required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecDesktop}} "Create a shortcut on your desktop"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartMenu}} "Create shortcuts in your Start Menu"
+  !insertmacro MUI_DESCRIPTION_TEXT ${{SecStartup}} "Automatically start SELO FileFlow when Windows starts"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+; Uninstaller section
+Section "Uninstall"
+  ; Remove files and directories
+  RMDir /r "$INSTDIR\\*.*"
+  RMDir "$INSTDIR"
+  
+  ; Remove shortcuts
+  Delete "$SMPROGRAMS\\SELOdev\\SELO FileFlow.lnk"
+  Delete "$SMPROGRAMS\\SELOdev\\Uninstall SELO FileFlow.lnk"
+  RMDir "$SMPROGRAMS\\SELOdev" 
+  Delete "$DESKTOP\\SELO FileFlow.lnk"
+  
+  ; Remove registry keys
+  DeleteRegKey HKCU "Software\\SELOdev\\SELO FileFlow"
+  DeleteRegKey HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SELOFileFlow"
+  DeleteRegValue HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "SELOFileFlow"
+SectionEnd
+"""
+
+    # Write NSIS script to file
+    print("Creating NSIS installer script...")
+    with open("installer.nsi", "w") as f:
+        f.write(nsis_script)
+    
+    # Check if makensis is available
+    try:
+        # Try to find makensis in the default NSIS installation directory
+        nsis_paths = [
+            r"C:\Program Files\NSIS\makensis.exe",
+            r"C:\Program Files (x86)\NSIS\makensis.exe"
+        ]
+        
+        makensis_path = None
+        for path in nsis_paths:
+            if os.path.exists(path):
+                makensis_path = path
+                break
+        
+        if makensis_path:
+            print(f"Found NSIS at: {makensis_path}")
+        else:
+            # Try to run makensis directly (if it's in PATH)
+            subprocess.check_call(["makensis", "-VERSION"], 
+                                 stdout=subprocess.PIPE, 
+                                 stderr=subprocess.PIPE)
+            makensis_path = "makensis"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        print("NSIS not found. Please check your NSIS installation.")
+        print("You can download NSIS from https://nsis.sourceforge.io/")
+        return False
+    
+    # Run NSIS to create installer
+    print("Creating Windows installer with NSIS...")
+    try:
+        if makensis_path == "makensis":
+            subprocess.check_call(["makensis", "installer.nsi"])
+        else:
+            subprocess.check_call([makensis_path, "installer.nsi"])
+        
+        # Check if installer was created
+        installer_path = f"SELO-FileFlow-Setup-{version}.exe"
+        if os.path.exists(installer_path):
+            print(f"Installer created successfully: {os.path.abspath(installer_path)}")
+            
+            # Move installer to dist directory
+            dist_path = os.path.join("dist", installer_path)
+            if not os.path.exists("dist"):
+                os.makedirs("dist")
+            
+            # Move to dist folder
+            os.replace(installer_path, dist_path)
+            print(f"Installer moved to: {os.path.abspath(dist_path)}")
+            return True
+        else:
+            print(f"Error: Installer not found at {installer_path}")
+            return False
+    except subprocess.SubprocessError as e:
+        print(f"Error running NSIS: {e}")
+        return False
+
+if __name__ == "__main__":
+    if create_windows_installer():
+        print("Installer creation completed successfully!")
+    else:
+        print("Failed to create installer.")
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: create_installer_graphics.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 3307 bytes 
+LAST MODIFIED: 05/24/2025 11:28 AM 
+----------------------------------------------------------------- 
+ 
+"""
+Create placeholder graphics files for the SELO FileFlow installer.
+"""
+
+from pathlib import Path
+import os
+
+def create_empty_bitmap(filename, width, height):
+    """Create an empty BMP file with the specified dimensions."""
+    # BMP file header (14 bytes)
+    file_header = bytearray([
+        0x42, 0x4D,             # Signature 'BM'
+        0x3E, 0x00, 0x00, 0x00, # File size in bytes (62 bytes for a minimal 1x1 BMP)
+        0x00, 0x00,             # Reserved
+        0x00, 0x00,             # Reserved
+        0x36, 0x00, 0x00, 0x00  # Offset to pixel data (54 bytes)
+    ])
+    
+    # DIB header (40 bytes)
+    dib_header = bytearray([
+        0x28, 0x00, 0x00, 0x00, # DIB header size (40 bytes)
+        width & 0xFF, (width >> 8) & 0xFF, 0x00, 0x00,  # Width in pixels
+        height & 0xFF, (height >> 8) & 0xFF, 0x00, 0x00, # Height in pixels
+        0x01, 0x00,             # Number of color planes (1)
+        0x18, 0x00,             # Bits per pixel (24 - RGB)
+        0x00, 0x00, 0x00, 0x00, # Compression method (none)
+        0x00, 0x00, 0x00, 0x00, # Image size (can be 0 for uncompressed)
+        0xC4, 0x0E, 0x00, 0x00, # Horizontal resolution (3780 pixels per meter)
+        0xC4, 0x0E, 0x00, 0x00, # Vertical resolution (3780 pixels per meter)
+        0x00, 0x00, 0x00, 0x00, # Number of colors in palette (none)
+        0x00, 0x00, 0x00, 0x00  # Number of important colors (all)
+    ])
+    
+    # Pixel data (blue, green, red)
+    # Create a simple color (light blue) for all pixels
+    pixel_data = bytearray()
+    
+    # Ensure each row has a multiple of 4 bytes (BMP row padding)
+    row_size = (width * 3)  # 3 bytes per pixel (RGB)
+    padding_size = (4 - (row_size % 4)) % 4
+    
+    for y in range(height):
+        for x in range(width):
+            # Create a gradient from blue to white
+            blue_value = min(255, 180 + int(75 * x / width))
+            green_value = min(255, 180 + int(75 * y / height))
+            red_value = min(200, 150 + int(50 * (x + y) / (width + height)))
+            
+            pixel_data.extend([blue_value, green_value, red_value])
+        
+        # Add padding to ensure each row is a multiple of 4 bytes
+        pixel_data.extend([0] * padding_size)
+    
+    # Calculate the actual file size
+    file_size = 14 + 40 + len(pixel_data)
+    file_header[2] = file_size & 0xFF
+    file_header[3] = (file_size >> 8) & 0xFF
+    file_header[4] = (file_size >> 16) & 0xFF
+    file_header[5] = (file_size >> 24) & 0xFF
+    
+    # Write the BMP file
+    with open(filename, 'wb') as f:
+        f.write(file_header)
+        f.write(dib_header)
+        f.write(pixel_data)
+
+def main():
+    # Create resources directory if it doesn't exist
+    resources_dir = Path("resources")
+    resources_dir.mkdir(exist_ok=True)
+    
+    # Create placeholder BMP files for the installer
+    print("Creating placeholder installer graphics...")
+    
+    # Side image (shown on welcome/finish pages) - typical size is 164x314 pixels
+    create_empty_bitmap(os.path.join(resources_dir, "installer-side.bmp"), 164, 314)
+    
+    # Header image - typical size is 150x57 pixels
+    create_empty_bitmap(os.path.join(resources_dir, "installer-header.bmp"), 150, 57)
+    
+    print("Placeholder graphics created successfully.")
+
+if __name__ == "__main__":
+    main()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: fix_windows_integration.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 4965 bytes 
+LAST MODIFIED: 05/24/2025 04:04 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Comprehensive fix for Windows integration issues in FileFlow.
+This will completely solve the title bar icon and notification name problems.
+"""
+import os
+import sys
+import shutil
+import winreg
+import subprocess
+from pathlib import Path
+
+def reset_windows_notification_cache():
+    """Reset the Windows notification cache to clear any old app identities."""
+    # This may require administrator privileges
+    print("Attempting to reset Windows notification cache...")
+    
+    try:
+        # Kill the Windows explorer process (this won't affect the script)
+        subprocess.run("taskkill /f /im explorer.exe", shell=True, check=False)
+        
+        # Clear notification database - path varies by Windows version
+        paths_to_clear = [
+            os.path.expanduser("~\\AppData\\Local\\Microsoft\\Windows\\Notifications"),
+            os.path.expanduser("~\\AppData\\Local\\Microsoft\\Windows\\ActionCenter")
+        ]
+        
+        for path in paths_to_clear:
+            if os.path.exists(path):
+                print(f"Clearing notification data in: {path}")
+                for item in os.listdir(path):
+                    if item.endswith(".db"):
+                        try:
+                            os.remove(os.path.join(path, item))
+                            print(f"Removed {item}")
+                        except Exception as e:
+                            print(f"Could not remove {item}: {e}")
+        
+        # Restart explorer
+        subprocess.Popen("explorer.exe", shell=True)
+        print("Windows Explorer restarted.")
+    except Exception as e:
+        print(f"Error resetting notification cache: {e}")
+        print("You may need to run this script as administrator.")
+
+def fix_registry_entries():
+    """Update Windows registry entries to fix application identity."""
+    print("Updating registry entries...")
+    
+    try:
+        # Ensure FileFlow key exists and has correct values
+        key_path = r"Software\FileFlow"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "Name", 0, winreg.REG_SZ, "FileFlow")
+            winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "SELOdev")
+            print("Updated FileFlow registry entries")
+        
+        # Fix app user model ID in the registry
+        key_path = r"Software\Classes\AppUserModelId\SELOdev.FileFlow"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "FileFlow")
+            print("Created AppUserModelId registry entry")
+            
+        print("Registry entries updated successfully")
+    except Exception as e:
+        print(f"Error updating registry: {e}")
+
+def update_shortcut_properties():
+    """Update shortcut properties to ensure correct icon and app identity."""
+    print("Updating shortcuts...")
+    
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        
+        # Find icon path
+        app_dir = Path(__file__).parent
+        icon_path = app_dir / "resources" / "icon.ico"
+        
+        if not icon_path.exists():
+            print(f"Error: Icon not found at {icon_path}")
+            return
+            
+        # Update desktop shortcut
+        desktop = shell.SpecialFolders("Desktop")
+        shortcut_path = os.path.join(desktop, "FileFlow.lnk")
+        
+        if os.path.exists(shortcut_path):
+            shortcut = shell.CreateShortCut(shortcut_path)
+            shortcut.IconLocation = str(icon_path)
+            shortcut.Description = "FileFlow File Organizer"
+            shortcut.save()
+            print(f"Updated desktop shortcut at {shortcut_path}")
+        
+        # Update Start Menu shortcut
+        start_menu = shell.SpecialFolders("Programs")
+        start_menu_path = os.path.join(start_menu, "FileFlow", "FileFlow.lnk")
+        
+        if os.path.exists(start_menu_path):
+            shortcut = shell.CreateShortCut(start_menu_path)
+            shortcut.IconLocation = str(icon_path)
+            shortcut.Description = "FileFlow File Organizer"
+            shortcut.save()
+            print(f"Updated Start Menu shortcut at {start_menu_path}")
+            
+        print("Shortcuts updated successfully")
+    except Exception as e:
+        print(f"Error updating shortcuts: {e}")
+        print("You may need to install pywin32: pip install pywin32")
+
+def apply_fixes():
+    """Apply all fixes."""
+    print("=== FileFlow Windows Integration Fix ===")
+    
+    # 1. Fix registry entries
+    fix_registry_entries()
+    
+    # 2. Update shortcuts
+    update_shortcut_properties()
+    
+    # 3. Reset notification cache
+    reset_windows_notification_cache()
+    
+    print("\nAll fixes have been applied. Please restart your computer for changes to take effect.")
+    print("After restart, the title bar icon and notification name should be correct.")
+
+if __name__ == "__main__":
+    apply_fixes()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: icon_fix.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 2252 bytes 
+LAST MODIFIED: 05/24/2025 03:52 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Comprehensive icon fix for FileFlow
+"""
+import os
+import sys
+import ctypes
+import winreg
+from pathlib import Path
+
+def fix_application_icons():
+    """Apply comprehensive fixes for FileFlow icons"""
+    print("Applying FileFlow icon fixes...")
+    
+    # 1. Get the application directory
+    app_dir = Path(__file__).parent.absolute()
+    icon_path = app_dir / "resources" / "icon.ico"
+    
+    if not icon_path.exists():
+        print(f"ERROR: Icon file not found at {icon_path}")
+        return False
+    
+    print(f"Found icon at: {icon_path}")
+    
+    # 2. Register Windows AppUserModelID for proper taskbar/title bar behavior
+    try:
+        app_id = "SELOdev.FileFlow.Application"
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        print(f"Set Windows AppUserModelID to: {app_id}")
+    except Exception as e:
+        print(f"Failed to set AppUserModelID: {e}")
+    
+    # 3. Fix Windows registry entries for the application
+    try:
+        # Registry entry for FileFlow
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\FileFlow") as key:
+            winreg.SetValueEx(key, "IconPath", 0, winreg.REG_SZ, str(icon_path))
+            print(f"Updated registry icon path: {icon_path}")
+    except Exception as e:
+        print(f"Failed to update registry: {e}")
+    
+    # 4. Create or update desktop shortcut with correct icon
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        desktop_path = shell.SpecialFolders("Desktop")
+        shortcut_path = os.path.join(desktop_path, "FileFlow.lnk")
+        
+        if os.path.exists(shortcut_path):
+            shortcut = shell.CreateShortCut(shortcut_path)
+            exe_path = app_dir / "dist" / "FileFlow" / "FileFlow.exe"
+            if exe_path.exists():
+                shortcut.TargetPath = str(exe_path)
+                shortcut.IconLocation = f"{icon_path},0"
+                shortcut.save()
+                print(f"Updated desktop shortcut icon at: {shortcut_path}")
+    except Exception as e:
+        print(f"Failed to update desktop shortcut: {e}")
+        
+    print("Icon fixes applied successfully!")
+    return True
+
+if __name__ == "__main__":
+    fix_application_icons()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: icon_hook.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 1201 bytes 
+LAST MODIFIED: 05/24/2025 04:51 PM 
+----------------------------------------------------------------- 
+ 
+"""
+PyInstaller runtime hook to force icon loading at application startup
+"""
+import os
+import sys
+
+# This will be executed when the application starts from the PyInstaller bundle
+def apply_icon_fix():
+    # Only needed on Windows
+    if sys.platform != 'win32':
+        return
+        
+    # Check if we're running in a PyInstaller bundle
+    if not (getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')):
+        return
+        
+    try:
+        # Windows-specific modules
+        import ctypes
+        
+        # Set explicit app ID for Windows
+        app_id = 'SELOdev.FileFlow.App.1.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        
+        # Debug info - will appear in console if run with console=True
+        print(f"Icon hook: Applied Windows app ID: {app_id}")
+        
+        # Force icon cache refresh
+        try:
+            ctypes.windll.user32.SendMessageW(0xFFFF, 0x001C, 0, 0)
+        except Exception as e:
+            print(f"Icon hook: Error refreshing icon cache: {e}")
+    except Exception as e:
+        print(f"Icon hook: Failed to apply icon fix: {e}")
+
+# Apply the fix immediately when this module is imported
+apply_icon_fix()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: run_fileflow.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 2260 bytes 
+LAST MODIFIED: 05/25/2025 09:19 PM 
+----------------------------------------------------------------- 
+ 
+#!/usr/bin/env python3
+"""
+Launcher script for SELO FileFlow.
+This script can launch either the command-line or graphical user interface version.
+"""
+
+import sys
+import os
+import argparse
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.absolute()
+sys.path.insert(0, str(project_root))
+
+# Import the user_dirs module after adding project root to path
+from src.modules.user_dirs import user_dirs
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='SELO FileFlow - Automatically organize downloaded files')
+    # Use user_dirs to determine default config path
+    default_config = str(user_dirs.get_file_path('config', 'settings.yaml'))
+    parser.add_argument('--config', type=str, default=default_config,
+                      help='Path to configuration file')
+    parser.add_argument('--daemon', action='store_true', help='Run in daemon mode (CLI only)')
+    parser.add_argument('--process-once', action='store_true', 
+                      help='Process files once and exit (CLI only)')
+    parser.add_argument('--ui', action='store_true', help='Launch with graphical user interface')
+    parser.add_argument('--minimized', action='store_true', help='Start UI minimized to system tray')
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    # Get and ensure logs directory exists using user_dirs module
+    logs_dir = user_dirs.get_dir('logs')
+    
+    # Check if running as a packaged application
+    is_frozen = user_dirs.is_frozen
+    
+    # Parse command line arguments
+    args = parse_arguments()
+    
+    # Default to UI mode when running as packaged application unless explicitly set to CLI mode
+    use_ui = args.ui or (is_frozen and not (args.daemon or args.process_once))
+    
+    if use_ui:
+        # Launch the GUI version
+        from src.ui_app import main as ui_main
+        # Pass our args directly to the UI app
+        sys.argv = [sys.argv[0]]
+        if args.config:
+            sys.argv.extend(['--config', args.config])
+        if args.minimized:
+            sys.argv.append('--minimized')
+        ui_main()
+    else:
+        # Launch the CLI version
+        from src.main import main as cli_main
+        cli_main()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: user_dirs_hook.py 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 2434 bytes 
+LAST MODIFIED: 05/25/2025 09:21 PM 
+----------------------------------------------------------------- 
+ 
+"""
+PyInstaller hook for SELO FileFlow.
+This runtime hook ensures proper handling of user directories when running as a packaged application.
+"""
+import os
+import sys
+from pathlib import Path
+
+# This will run before the application starts
+def setup_user_directories():
+    """Set up user-specific directories for the packaged application."""
+    try:
+        # Check if running as a packaged application
+        is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+        
+        if is_frozen:
+            # Determine base user directory for data
+            if sys.platform == 'win32':
+                # Windows: Use AppData
+                base_user_dir = Path(os.environ.get('APPDATA', '')) / "SELOdev" / "FileFlow"
+            else:
+                # Unix/Linux/Mac: Use ~/.fileflow
+                base_user_dir = Path(os.path.expanduser("~")) / ".fileflow"
+            
+            # Create user directories if they don't exist
+            for dir_name in ['config', 'logs', 'data', 'cache']:
+                dir_path = base_user_dir / dir_name
+                dir_path.mkdir(parents=True, exist_ok=True)
+                
+            # Copy default config if it doesn't exist in user directory
+            user_config = base_user_dir / "config" / "settings.yaml"
+            if not user_config.exists():
+                # Try to copy from packaged resources
+                default_config_paths = [
+                    Path(sys._MEIPASS) / "config" / "settings.yaml",
+                    Path(sys._MEIPASS) / "settings.yaml"
+                ]
+                
+                for default_config in default_config_paths:
+                    if default_config.exists():
+                        try:
+                            # Create parent directory if needed
+                            user_config.parent.mkdir(parents=True, exist_ok=True)
+                            
+                            # Copy the default config
+                            with open(default_config, 'r') as src, open(user_config, 'w') as dst:
+                                dst.write(src.read())
+                            break
+                        except Exception:
+                            # Continue to next path if copy fails
+                            pass
+    except Exception:
+        # Don't let errors in this hook prevent the application from starting
+        pass
+
+# Run the setup
+setup_user_directories()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: direct_fix_app.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 3470 bytes 
+LAST MODIFIED: 05/24/2025 04:04 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Complete fix for FileFlow icon and notification issues.
+This script should be run after installation to fix any lingering issues.
+"""
+import os
+import sys
+import ctypes
+import subprocess
+from pathlib import Path
+
+def fix_app_identity():
+    """Apply comprehensive fixes for FileFlow icons and notifications"""
+    print("Applying FileFlow identity fixes...")
+    
+    # Get the installation directory
+    if getattr(sys, 'frozen', False):
+        # Running as executable
+        app_dir = Path(sys.executable).parent
+    else:
+        # Running as script
+        app_dir = Path(__file__).parent.parent.absolute()
+    
+    icon_path = app_dir / "resources" / "icon.ico"
+    
+    if not icon_path.exists():
+        print(f"ERROR: Icon file not found at {icon_path}")
+        return False
+    
+    print(f"Found icon at: {icon_path}")
+    
+    # Fix 1: Windows AppUserModelID for title bar icon
+    try:
+        app_id = "SELOdev.FileFlow.App.1.0.0"
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        print(f"Set Windows AppUserModelID to: {app_id}")
+    except Exception as e:
+        print(f"Failed to set AppUserModelID: {e}")
+    
+    # Fix 2: Fix application name in Windows registry
+    try:
+        import winreg
+        # Main app registration
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\FileFlow") as key:
+            winreg.SetValueEx(key, "AppName", 0, winreg.REG_SZ, "FileFlow")
+            winreg.SetValueEx(key, "IconPath", 0, winreg.REG_SZ, str(icon_path))
+            print("Updated registry application name and icon path")
+    except Exception as e:
+        print(f"Failed to update registry: {e}")
+    
+    # Fix 3: Clear notification cache
+    try:
+        # Windows notification cache directory
+        notification_dir = Path.home() / "AppData" / "Local" / "Microsoft" / "Windows" / "Notifications"
+        print(f"Notification directory: {notification_dir}")
+        
+        # Clean up notification database - requires admin rights
+        command = f'TASKKILL /F /IM explorer.exe && DEL /F "{notification_dir}\\*" && START explorer.exe'
+        print(f"To clear notification cache completely, run this as admin: {command}")
+    except Exception as e:
+        print(f"Failed to clear notification cache: {e}")
+    
+    # Fix 4: Create direct shortcut with explicit icon
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        desktop = shell.SpecialFolders("Desktop")
+        shortcut_path = os.path.join(desktop, "FileFlow.lnk")
+        
+        # Target executable
+        if getattr(sys, 'frozen', False):
+            target = sys.executable
+        else:
+            target = os.path.join(app_dir, "FileFlow.exe")
+            
+        if os.path.exists(target) or os.path.exists(shortcut_path):
+            shortcut = shell.CreateShortCut(shortcut_path)
+            shortcut.TargetPath = target
+            shortcut.IconLocation = f"{icon_path},0"
+            shortcut.Description = "FileFlow File Organization Tool"
+            shortcut.WorkingDirectory = os.path.dirname(target)
+            shortcut.save()
+            print(f"Created desktop shortcut with explicit icon at: {shortcut_path}")
+    except Exception as e:
+        print(f"Failed to create shortcut: {e}")
+    
+    print("Identity fixes applied. Please restart the application and Windows Explorer.")
+    return True
+
+if __name__ == "__main__":
+    fix_app_identity()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: fix_windows_icon.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 1257 bytes 
+LAST MODIFIED: 05/24/2025 03:54 PM 
+----------------------------------------------------------------- 
+ 
+"""
+This script fixes Windows icon-related issues by adding explicit resource handling.
+"""
+import os
+import sys
+import ctypes
+from PyQt5.QtWinExtras import QtWin
+from PyQt5.QtGui import QIcon
+
+def fix_windows_icon():
+    """Apply specific Windows fixes for application icon"""
+    try:
+        # Set AppUserModelID (needed for Windows taskbar/titlebar icon)
+        app_id = 'selodev.fileflow.1.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        
+        # Get icon path
+        icon_path = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 
+            'resources', 
+            'icon.ico'
+        ))
+        
+        if os.path.exists(icon_path):
+            # Set taskbar icon explicitly using QtWin
+            if hasattr(QtWin, 'setCurrentProcessExplicitAppUserModelID'):
+                QtWin.setCurrentProcessExplicitAppUserModelID(app_id)
+            
+            # Set window icon for taskbar grouping
+            if hasattr(QtWin, 'ExtendedWindow'):
+                icon = QIcon(icon_path)
+                QtWin.setWindowIcon(icon)
+                
+            return True
+    except Exception as e:
+        print(f"Error setting Windows icon: {e}")
+    
+    return False
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: main.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 4531 bytes 
+LAST MODIFIED: 05/24/2025 03:21 PM 
+----------------------------------------------------------------- 
+ 
+#!/usr/bin/env python3
+"""
+SELO FileFlow main module.
+Monitors download directory and organizes files based on their types.
+"""
+
+import sys
+import time
+import logging
+import argparse
+from pathlib import Path
+
+from watchdog.observers import Observer
+
+from src.modules.file_handler import FileHandler
+from src.modules.config_manager import ConfigManager
+from src.modules.event_handler import FileEventHandler
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(Path(__file__).parent.parent / 'logs' / 'fileflow.log', mode='a')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='FileFlow - Automatically organize downloaded files')
+    parser.add_argument('--config', type=str, default=str(Path(__file__).parent.parent / 'config' / 'settings.yaml'),
+                      help='Path to configuration file')
+    parser.add_argument('--daemon', action='store_true', help='Run as daemon')
+    parser.add_argument('--process-once', action='store_true', 
+                      help='Process files once and exit (for scheduled task usage)')
+    return parser.parse_args()
+
+def main():
+    """Main function to start FileFlow."""
+    args = parse_arguments()
+    
+    try:
+        # Create logs directory if it doesn't exist
+        log_dir = Path(__file__).parent.parent / 'logs'
+        log_dir.mkdir(exist_ok=True)
+        
+        # Load configuration
+        config_path = Path(args.config)
+        if not config_path.exists():
+            logger.error(f"Configuration file not found: {config_path}")
+            sys.exit(1)
+        
+        config_manager = ConfigManager(config_path)
+        config = config_manager.get_config()
+        
+        # Create file handler
+        file_handler = FileHandler(config)
+        
+        # Get source directory
+        source_dir = Path(config['source_directory']).expanduser().resolve()
+        if not source_dir.exists():
+            logger.error(f"Source directory does not exist: {source_dir}")
+            sys.exit(1)
+        
+        # If process-once flag is set, just process existing files and exit
+        if args.process_once:
+            logger.info(f"Processing files in: {source_dir} (one-time mode)")
+            processed_count = 0
+            
+            for file_path in source_dir.iterdir():
+                if file_path.is_file():
+                    if file_handler.process_file(file_path):
+                        processed_count += 1
+            
+            logger.info(f"Processed {processed_count} files. Exiting.")
+            return
+        
+        # Otherwise, set up continuous monitoring
+        # Create event handler and observer
+        event_handler = FileEventHandler(file_handler)
+        observer = Observer()
+        
+        logger.info(f"Starting to monitor directory: {source_dir}")
+        observer.schedule(event_handler, str(source_dir), recursive=False)
+        observer.start()
+        
+        # Process existing files if configured to do so
+        if config.get('organize_existing_files', True):
+            logger.info("Processing existing files...")
+            for file_path in source_dir.iterdir():
+                if file_path.is_file():
+                    file_handler.process_file(file_path)
+        
+        try:
+            # Check if running as bundled executable (stdin might not be available)
+            is_bundled = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+            
+            if args.daemon or is_bundled:
+                logger.info("Running in background mode. Press Ctrl+C to exit.")
+                while True:
+                    time.sleep(1)
+            else:
+                # Only use input() when running from source and stdin is available
+                try:
+                    input("Press Enter to exit...\n")
+                except (EOFError, RuntimeError):
+                    # Fallback if stdin is not available
+                    while True:
+                        time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Stopping observer...")
+            observer.stop()
+        
+        observer.join()
+        logger.info("Observer stopped. Exiting...")
+    
+    except Exception as e:
+        logger.exception(f"An error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: set_app_id.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 657 bytes 
+LAST MODIFIED: 05/24/2025 03:46 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Set Windows application ID for proper taskbar and title bar icon handling.
+"""
+import sys
+import ctypes
+
+def set_app_id():
+    """
+    Set the Windows Application User Model ID (AUMID).
+    This helps Windows properly associate the application with its icon.
+    """
+    if sys.platform == 'win32':
+        try:
+            app_id = "SELOdev.FileFlow.1.0"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+            print(f"Set Windows AppUserModelID to: {app_id}")
+            return True
+        except Exception as e:
+            print(f"Failed to set AppUserModelID: {e}")
+            return False
+    return False
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: ui_app.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 5059 bytes 
+LAST MODIFIED: 05/25/2025 09:20 PM 
+----------------------------------------------------------------- 
+ 
+#!/usr/bin/env python3
+"""
+UI Application entry point for SELO FileFlow.
+Launches the PyQt5-based graphical user interface.
+"""
+
+import sys
+import os
+import logging
+import argparse
+from pathlib import Path
+
+from src.modules.ui_manager import run_ui
+from src.set_app_id import set_app_id
+from src.modules.user_dirs import user_dirs
+
+# Get logs directory using user_dirs module
+logs_dir = user_dirs.get_dir('logs')
+log_file = logs_dir / 'fileflow.log'
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file, mode='a')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='SELO FileFlow UI - Graphical interface for file organization')
+    # Use user_dirs to get the appropriate config path
+    default_config = str(user_dirs.get_file_path('config', 'settings.yaml'))
+    parser.add_argument('--config', type=str, default=default_config,
+                      help='Path to configuration file')
+    parser.add_argument('--minimized', action='store_true', help='Start minimized to system tray')
+    return parser.parse_args()
+
+def main():
+    """Main function to start the UI application."""
+    try:
+        # Logs directory is already set up in the logging configuration above
+        
+        # DIRECT FIX: Force Windows to recognize our application correctly
+        if sys.platform == 'win32':
+            try:
+                # Import Windows-specific modules
+                import ctypes
+                import win32api
+                import win32con
+                import win32gui
+                from PyQt5.QtWidgets import QApplication
+                from PyQt5.QtGui import QIcon
+                
+                # Determine icon path - important to find it in various environments
+                icon_paths = [
+                    # Development path
+                    str(Path(__file__).parent.parent / 'resources' / 'icon.ico'),
+                    # PyInstaller bundled paths
+                    'icon.ico',
+                    'resources/icon.ico',
+                    str(Path('resources') / 'icon.ico')
+                ]
+                
+                # Check for PyInstaller bundle
+                if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                    # Add PyInstaller-specific paths
+                    icon_paths.extend([
+                        str(Path(sys._MEIPASS) / 'icon.ico'),
+                        str(Path(sys._MEIPASS) / 'resources' / 'icon.ico')
+                    ])
+                
+                # Find first valid icon path
+                icon_path = None
+                for path in icon_paths:
+                    if os.path.exists(path):
+                        icon_path = path
+                        logger.info(f"Found icon at: {icon_path}")
+                        break
+                
+                if icon_path:
+                    # Set explicit app ID (most important step for correct title bar icon)
+                    app_id = 'SELODEV.FileFlow.App.1.0'
+                    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+                    
+                    # Initialize QApplication early to set the icon
+                    if QApplication.instance() is None:
+                        app = QApplication(sys.argv)
+                    else:
+                        app = QApplication.instance()
+                    
+                    # Set application icon
+                    app_icon = QIcon(icon_path)
+                    app.setWindowIcon(app_icon)
+                    
+                    # Register window class with icon
+                    big_icon = win32gui.LoadImage(
+                        0, icon_path, win32con.IMAGE_ICON,
+                        0, 0, win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+                    )
+                    small_icon = win32gui.LoadImage(
+                        0, icon_path, win32con.IMAGE_ICON,
+                        16, 16, win32con.LR_LOADFROMFILE
+                    )
+                    
+                    # Force Windows to refresh icon cache for our app
+                    ctypes.windll.user32.SendMessageW(0xFFFF, 0x001C, 0, 0)  # Broadcast WM_SETTINGCHANGE
+                    
+                    logger.info(f"Set Windows application ID to: {app_id} with icon: {icon_path}")
+                else:
+                    logger.error("Could not find application icon!")
+            except Exception as e:
+                logger.error(f"Windows integration error: {e}")
+        
+        # Parse arguments
+        args = parse_arguments()
+        
+        # Launch UI
+        logger.info("Starting FileFlow UI")
+        run_ui(config_path=args.config)
+        
+    except Exception as e:
+        logger.exception(f"An error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: __init__.py 
+PATH: E:\GitHub\SELO-FileFlow\src\ 
+SIZE: 220 bytes 
+LAST MODIFIED: 05/24/2025 12:35 AM 
+----------------------------------------------------------------- 
+ 
+# SELO FileFlow package
+"""
+SELO FileFlow - A professional file management solution from SELOdev that
+automatically organizes downloaded files into appropriate directories based on file types.
+"""
+
+__version__ = '0.1.0'
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: config_manager.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 8115 bytes 
+LAST MODIFIED: 05/25/2025 09:20 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Configuration manager for the FileFlow application.
+Handles loading and validation of configuration settings.
+"""
+
+import os
+import sys
+import yaml
+import logging
+from pathlib import Path
+from typing import Dict, Any
+
+from src.modules.user_dirs import user_dirs
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CONFIG = {
+    'source_directory': str(Path.home() / 'Downloads'),  # Can be a string or list of strings
+    'destination_directories': {
+        'images': str(Path.home() / 'Pictures' / 'Downloaded'),
+        'documents': str(Path.home() / 'Documents' / 'Downloaded'),
+        'videos': str(Path.home() / 'Videos' / 'Downloaded'),
+        'software': str(Path.home() / 'Downloads' / 'Software'),
+        'other': str(Path.home() / 'Downloads' / 'Other')
+    },
+    'file_types': {
+        'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg', '.ico', '.heic'],
+        'documents': ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.odt', '.ods', '.odp', '.csv', '.epub', '.mobi'],
+        'videos': ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp'],
+        'software': ['.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm', '.appimage', '.apk', '.zip', '.rar', '.7z', '.tar', '.gz', '.iso']
+    },
+    'logging': {
+        'level': 'INFO',
+        'file': 'logs/fileflow.log'
+    },
+    'move_files': True,  # If False, files will be copied instead of moved
+    'organize_existing_files': True,  # Process files that already exist in the source directory
+    'notify_on_move': True  # Desktop notification when files are organized
+}
+
+
+class ConfigManager:
+    """Manages configuration settings for the application."""
+    
+    def __init__(self, config_path):
+        """
+        Initialize the configuration manager.
+        
+        Args:
+            config_path (Path): Path to the configuration file.
+        """
+        # Convert config_path to Path if it's not already
+        config_path = Path(config_path) if not isinstance(config_path, Path) else config_path
+        
+        # If the path is in a protected directory, use the user_dirs module
+        if user_dirs.is_protected_directory(config_path):
+            # Use the same filename from the original config_path
+            filename = config_path.name
+            self.config_path = user_dirs.get_file_path('config', filename)
+            logger.info(f"Using user-specific config path: {self.config_path}")
+        else:
+            self.config_path = config_path
+        
+        self.config = self._load_config()
+        self._ensure_directories_exist()
+    
+    # Removed _is_in_protected_directory method as it's now in the user_dirs module
+    
+    def _load_config(self):
+        """
+        Load configuration from file or create a default one if it doesn't exist.
+        
+        Returns:
+            dict: The configuration settings.
+        """
+        try:
+            if not self.config_path.exists():
+                logger.info(f"Configuration file not found at {self.config_path}. Creating default configuration.")
+                self._create_default_config()
+            
+            with open(self.config_path, 'r') as config_file:
+                config = yaml.safe_load(config_file)
+                logger.info(f"Configuration loaded successfully from {self.config_path}")
+                return self._validate_config(config)
+                
+        except Exception as e:
+            logger.error(f"Error loading configuration: {e}")
+            logger.info("Using default configuration")
+            return DEFAULT_CONFIG
+    
+    def _create_default_config(self):
+        """Create a default configuration file."""
+        try:
+            # Ensure the directory exists
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Try to write the config file
+            try:
+                with open(self.config_path, 'w') as config_file:
+                    yaml.dump(DEFAULT_CONFIG, config_file, default_flow_style=False, sort_keys=False)
+                logger.info(f"Default configuration created at {self.config_path}")
+            except PermissionError:
+                # If we can't write to the specified location, use the user_dirs module
+                fallback_path = user_dirs.get_file_path('config', 'settings.yaml')
+                
+                with open(fallback_path, 'w') as config_file:
+                    yaml.dump(DEFAULT_CONFIG, config_file, default_flow_style=False, sort_keys=False)
+                
+                # Update the config path to the new location
+                self.config_path = fallback_path
+                logger.info(f"Created configuration in fallback location: {self.config_path}")
+        except Exception as e:
+            logger.error(f"Error creating default configuration: {e}")
+    
+    def _validate_config(self, config):
+        """
+        Validate and fill in missing configuration with defaults.
+        
+        Args:
+            config (dict): The configuration to validate.
+            
+        Returns:
+            dict: The validated configuration.
+        """
+        validated_config = DEFAULT_CONFIG.copy()
+        
+        for key, value in config.items():
+            if key in validated_config:
+                if isinstance(value, dict) and isinstance(validated_config[key], dict):
+                    for subkey, subvalue in value.items():
+                        validated_config[key][subkey] = subvalue
+                else:
+                    validated_config[key] = value
+        
+        return validated_config
+    
+    def _ensure_directories_exist(self):
+        """Ensure that all configured directories exist."""
+        try:
+            # Ensure source directory exists
+            source_dir = Path(self.config['source_directory']).expanduser()
+            source_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Ensure destination directories exist
+            for category, directory in self.config['destination_directories'].items():
+                dest_dir = Path(directory).expanduser()
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Ensured destination directory exists: {dest_dir}")
+        
+        except Exception as e:
+            logger.error(f"Error ensuring directories exist: {e}")
+    
+    def get_config(self):
+        """
+        Get the current configuration.
+        
+        Returns:
+            dict: The current configuration.
+        """
+        return self.config
+    
+    def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update the configuration and save it to file.
+        
+        Args:
+            new_config: The new configuration settings.
+            
+        Returns:
+            The updated configuration.
+        """
+        try:
+            self.config = self._validate_config(new_config)
+            
+            try:
+                # Try to write to the configured path
+                with open(self.config_path, 'w') as config_file:
+                    yaml.dump(self.config, config_file, default_flow_style=False, sort_keys=False)
+                logger.info(f"Configuration updated and saved to {self.config_path}")
+            except PermissionError:
+                # If we can't write to the current location, use the user_dirs module
+                fallback_path = user_dirs.get_file_path('config', 'settings.yaml')
+                
+                with open(fallback_path, 'w') as config_file:
+                    yaml.dump(self.config, config_file, default_flow_style=False, sort_keys=False)
+                
+                # Update the config path for future saves
+                self.config_path = fallback_path
+                logger.warning(f"Couldn't write to {self.config_path}. Saved to {fallback_path} instead.")
+            
+            self._ensure_directories_exist()
+            return self.config
+        except Exception as e:
+            logger.error(f"Error updating configuration: {e}")
+            return self.config
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: direct_fixes.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 3277 bytes 
+LAST MODIFIED: 05/24/2025 04:21 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Direct fixes for FileFlow application UI issues.
+This module handles application icon and notification text problems.
+"""
+import os
+import sys
+from pathlib import Path
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class WindowsAppFixes:
+    """Windows-specific fixes for application UI issues."""
+    
+    @staticmethod
+    def apply_app_icon_fix():
+        """Fix the title bar icon on Windows."""
+        if sys.platform != 'win32':
+            return False
+            
+        try:
+            # 1. Use win32api for better control over window properties
+            import win32api
+            import win32con
+            import win32gui
+            import ctypes
+            
+            # Set the process AppUserModelID
+            app_id = 'SELOdev.FileFlow.Application.1'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+            logger.info(f"Set application ID: {app_id}")
+            
+            # Get the icon path
+            icon_path = os.path.abspath(os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                'resources', 'icon.ico'
+            ))
+            
+            if not os.path.exists(icon_path):
+                logger.error(f"Icon not found at: {icon_path}")
+                return False
+                
+            logger.info(f"Using icon: {icon_path}")
+            
+            # 2. Register a window class with our icon explicitly
+            # This approach ensures Windows consistently uses our icon
+            wc = win32gui.WNDCLASS()
+            wc.hIcon = win32gui.LoadImage(
+                0, icon_path, win32con.IMAGE_ICON,
+                0, 0, win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+            )
+            wc.lpszClassName = "FileFlowWindowClass"
+            win32gui.RegisterClass(wc)
+            logger.info("Registered custom window class with icon")
+            
+            # Return the custom window class name for later use
+            return "FileFlowWindowClass"
+            
+        except Exception as e:
+            logger.error(f"Failed to apply icon fix: {e}")
+            return False
+    
+    @staticmethod
+    def fix_notification_text(notification_text):
+        """Ensure no traces of 'Download Organizer' appear in notifications."""
+        if not notification_text:
+            return "FileFlow"
+            
+        # Replace any Download Organizer text with FileFlow
+        cleaned_text = notification_text.replace("Download Organizer", "FileFlow")
+        cleaned_text = cleaned_text.replace("download organizer", "FileFlow")
+        cleaned_text = cleaned_text.replace("DownloadOrganizer", "FileFlow")
+        
+        return cleaned_text
+
+def apply_all_fixes():
+    """Apply all fixes and return any needed variables."""
+    logger.info("Applying FileFlow direct fixes")
+    
+    # Apply Windows title bar icon fix
+    window_class = WindowsAppFixes.apply_app_icon_fix()
+    
+    # Return any values needed by the main application
+    return {
+        "window_class": window_class
+    }
+
+# Can be run directly for testing
+if __name__ == "__main__":
+    results = apply_all_fixes()
+    print(f"Fixes applied with results: {results}")
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: event_handler.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 3738 bytes 
+LAST MODIFIED: 05/24/2025 03:20 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Event handler for the FileFlow application.
+Monitors file system events and triggers file processing.
+"""
+
+import logging
+import time
+from pathlib import Path
+from watchdog.events import FileSystemEventHandler
+
+logger = logging.getLogger(__name__)
+
+class FileEventHandler(FileSystemEventHandler):
+    """
+    Event handler for file system events.
+    Processes files when they are created or modified in the monitored directory.
+    """
+    
+    def __init__(self, file_handler):
+        """
+        Initialize the event handler.
+        
+        Args:
+            file_handler (FileHandler): The file handler to use for processing files.
+        """
+        self.file_handler = file_handler
+        # Keep track of recently processed files to avoid duplicates
+        self.recently_processed = {}
+        # Debounce time in seconds
+        self.debounce_time = 3
+    
+    def on_created(self, event):
+        """
+        Handle file creation events.
+        
+        Args:
+            event (FileSystemEvent): The file system event.
+        """
+        if event.is_directory:
+            return
+        
+        self._process_event(event.src_path)
+    
+    def on_modified(self, event):
+        """
+        Handle file modification events.
+        
+        Args:
+            event (FileSystemEvent): The file system event.
+        """
+        if event.is_directory:
+            return
+        
+        self._process_event(event.src_path)
+    
+    def on_moved(self, event):
+        """
+        Handle file move events.
+        
+        Args:
+            event (FileSystemEvent): The file system event.
+        """
+        if event.is_directory:
+            return
+        
+        # Only process destination if it's in our monitored directory
+        self._process_event(event.dest_path)
+    
+    def _process_event(self, file_path):
+        """
+        Process a file event with debouncing to avoid processing the same file multiple times.
+        
+        Args:
+            file_path (str): Path to the file to process.
+        """
+        try:
+            path_obj = Path(file_path)
+            
+            # Skip if not a file
+            if not path_obj.is_file():
+                return
+            
+            # Skip if file was recently processed
+            current_time = time.time()
+            if file_path in self.recently_processed:
+                last_processed = self.recently_processed[file_path]
+                if current_time - last_processed < self.debounce_time:
+                    logger.debug(f"Skipping recently processed file: {file_path}")
+                    return
+            
+            # Mark file as recently processed
+            self.recently_processed[file_path] = current_time
+            
+            # Clean up old entries from recently_processed
+            self._clean_processed_cache()
+            
+            # Process the file after a short delay to ensure it's fully written
+            logger.info(f"New file detected: {path_obj.name}")
+            
+            # Give the file a moment to finish being written/downloaded
+            time.sleep(1)
+            
+            # Process the file
+            self.file_handler.process_file(file_path)
+            
+        except Exception as e:
+            logger.error(f"Error processing event for file '{file_path}': {e}")
+    
+    def _clean_processed_cache(self):
+        """Clean up old entries from the recently processed cache."""
+        current_time = time.time()
+        expired_paths = [
+            path for path, timestamp in self.recently_processed.items()
+            if current_time - timestamp > self.debounce_time * 5
+        ]
+        
+        for path in expired_paths:
+            del self.recently_processed[path]
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: file_handler.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 8876 bytes 
+LAST MODIFIED: 05/24/2025 12:00 PM 
+----------------------------------------------------------------- 
+ 
+"""
+File handler for the FileFlow application.
+Responsible for processing files and organizing them based on their types.
+"""
+
+import os
+import shutil
+import logging
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Optional, Union, Self, Literal
+
+logger = logging.getLogger(__name__)
+
+# Define common type aliases
+PathLike = Union[str, Path]
+FileCategory = Literal['images', 'documents', 'videos', 'software', 'other', 'archives', 'music']
+
+class FileHandler:
+    """Handles file operations for organizing downloads."""
+    
+    def __init__(self, config: Dict) -> None:
+        """
+        Initialize the file handler.
+        
+        Args:
+            config: The application configuration dictionary containing source and destination directories.
+        """
+        self.config = config
+        
+        # Handle source directory/directories using pattern matching (Python 3.10+)
+        source_dir_config = config['source_directory']
+        match source_dir_config:
+            case list():
+                # Multiple source directories
+                self.source_dirs: List[Path] = [
+                    Path(directory).expanduser().resolve()
+                    for directory in source_dir_config
+                ]
+            case str():
+                # Single source directory (string)
+                self.source_dirs = [Path(source_dir_config).expanduser().resolve()]
+            case _:
+                # Fallback for unexpected types
+                logger.warning(f"Unexpected source_directory type: {type(source_dir_config)}, using default")
+                self.source_dirs = [Path.home() / 'Downloads']
+        
+        # For backwards compatibility, keep a reference to the first source directory
+        self.source_dir: Path = self.source_dirs[0] if self.source_dirs else Path.home() / 'Downloads'
+        
+        self.destination_dirs: Dict[str, Path] = {
+            category: Path(directory).expanduser().resolve()
+            for category, directory in config['destination_directories'].items()
+        }
+        self.file_types: Dict[str, List[str]] = config['file_types']
+        self.move_files: bool = config.get('move_files', True)
+    
+    def get_file_category(self, file_path: PathLike) -> FileCategory:
+        """
+        Determine the category of a file based on its extension.
+        
+        Args:
+            file_path: Path to the file to categorize.
+            
+        Returns:
+            The category of the file ('images', 'documents', 'videos', 'software', or 'other').
+        """
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+            
+        file_extension = file_path.suffix.lower()
+        
+        # Using any() for a more concise check
+        for category, extensions in self.file_types.items():
+            if file_extension in extensions:
+                return category  # type: ignore # We ensure these match the FileCategory type
+        
+        return 'other'  # Default category
+    
+    def get_destination_path(self, file_path: PathLike, category: FileCategory) -> Path:
+        """
+        Get the destination path for a file.
+        
+        Args:
+            file_path: Path to the file.
+            category: The category of the file.
+            
+        Returns:
+            The destination path for the file, with uniqueness handling.
+        """
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+            
+        # Use pattern matching to handle destination directory selection
+        match self.destination_dirs.get(category):
+            case dest_dir if dest_dir is not None:
+                # Category exists in destination directories
+                pass
+            case _:
+                # Fallback to 'other' category
+                dest_dir = self.destination_dirs.get('other', self.source_dir.parent / 'Organized')
+                # Create the fallback directory if needed
+                dest_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if file with same name already exists
+        dest_path = dest_dir / file_path.name
+        if dest_path.exists():
+            # Add timestamp to filename to make it unique
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            dest_path = dest_dir / f"{file_path.stem}_{timestamp}{file_path.suffix}"
+        
+        return dest_path
+    
+    def process_file(self, file_path: PathLike) -> bool:
+        """
+        Process a file and move/copy it to the appropriate directory.
+        
+        Args:
+            file_path: Path to the file to process.
+            
+        Returns:
+            True if the file was processed successfully, False otherwise.
+        """
+        try:
+            file_path = Path(file_path).resolve()
+            
+            # Skip directories and non-existent files
+            if not file_path.is_file():
+                return False
+            
+            # Skip files that are not in any of the source directories
+            # Using any() for more concise Python code
+            file_in_source_dir = any(
+                source_dir in file_path.parents or source_dir == file_path.parent
+                for source_dir in self.source_dirs
+            )
+            
+            if not file_in_source_dir:
+                logger.debug(f"Skipping file outside source directories: {file_path}")
+                return False
+            
+            # Get file category
+            category = self.get_file_category(file_path)
+            
+            # Get destination path
+            dest_path = self.get_destination_path(file_path, category)
+            
+            # Create destination directory if it doesn't exist
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Use pattern matching to handle file operations (Python 3.10+)
+            match self.move_files:
+                case True:
+                    # Move the file
+                    shutil.move(str(file_path), str(dest_path))
+                    action = "Moved"
+                case False:
+                    # Copy the file
+                    shutil.copy2(str(file_path), str(dest_path))
+                    action = "Copied"
+            
+            logger.info(f"{action} '{file_path.name}' to {category} folder: {dest_path}")
+            return True
+            
+        # Use except* for grouping related exceptions (Python 3.11+)
+        except (PermissionError, FileNotFoundError) as e:
+            # File might be in use or locked
+            logger.warning(f"Could not process file '{file_path}': {e}")
+            return False
+        except OSError as e:
+            # Handle specific OS errors
+            logger.warning(f"OS error processing file '{file_path}': {e}")
+            return False
+        except Exception as e:
+            # Catch-all for unexpected errors
+            logger.error(f"Error processing file '{file_path}': {e}")
+            return False
+    
+    def process_directory(self, directory_path: PathLike, recursive: bool = False) -> int:
+        """
+        Process all files in a directory.
+        
+        Args:
+            directory_path: Path to the directory to process.
+            recursive: Whether to process subdirectories recursively.
+            
+        Returns:
+            Number of files processed successfully.
+        """
+        try:
+            directory_path = Path(directory_path).resolve()
+            
+            if not directory_path.is_dir():
+                logger.error(f"Not a directory: {directory_path}")
+                return 0
+            
+            processed_count = 0
+            
+            # Process files in directory using more efficient pattern matching
+            for item_path in directory_path.iterdir():
+                match item_path, recursive:
+                    case path, _ if path.is_file():
+                        # Process file
+                        if self.process_file(path):
+                            processed_count += 1
+                    case path, True if path.is_dir():
+                        # Process subdirectory recursively
+                        processed_count += self.process_directory(path, recursive=True)
+                    case _:
+                        # Skip other items (symlinks, etc.) or non-recursive directories
+                        pass
+            
+            return processed_count
+        
+        except PermissionError as e:
+            logger.error(f"Permission denied accessing directory '{directory_path}': {e}")
+            return 0
+        except OSError as e:
+            logger.error(f"OS error processing directory '{directory_path}': {e}")
+            return 0
+        except Exception as e:
+            logger.error(f"Error processing directory '{directory_path}': {e}")
+            return 0
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: ui_manager.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 37080 bytes 
+LAST MODIFIED: 05/24/2025 04:47 PM 
+----------------------------------------------------------------- 
+ 
+"""
+UI Manager for the SELO FileFlow application.
+Provides a PyQt5-based graphical interface for configuring and controlling the application.
+"""
+
+import os
+import sys
+import logging
+from pathlib import Path
+from functools import partial
+
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QListWidget, QFileDialog, QTabWidget, QFormLayout,
+    QLineEdit, QCheckBox, QMessageBox, QProgressDialog, QSystemTrayIcon,
+    QMenu, QAction, QSpinBox, QStyle, QDialog, QGridLayout, QComboBox,
+    QGroupBox, QListWidgetItem, QAbstractItemView, QSizePolicy
+)
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QFont, QWindow
+from PyQt5.QtCore import Qt, QSize, QTimer, pyqtSignal, QThread, QSettings
+
+# Import direct fixes module
+from src.modules.direct_fixes import WindowsAppFixes
+
+from src.modules.config_manager import ConfigManager
+from src.modules.file_handler import FileHandler
+
+logger = logging.getLogger(__name__)
+
+
+class FileProcessWorker(QThread):
+    """Worker thread for processing files in the background."""
+    
+    # Define signals for communication with main thread
+    progress_signal = pyqtSignal(int, int)  # current, total
+    status_signal = pyqtSignal(str)  # status message
+    finished_signal = pyqtSignal(int)  # total processed
+    error_signal = pyqtSignal(str)  # error message
+    
+    def __init__(self, config):
+        """Initialize the worker thread."""
+        super().__init__()
+        self.config = config
+        self.file_handler = FileHandler(config)
+        self.abort_flag = False
+    
+    def run(self):
+        """Process files in background thread."""
+        try:
+            processed_count = 0
+            source_dirs = self.config.get('source_directory', '')
+            
+            # Convert to list if it's a single string
+            if isinstance(source_dirs, str):
+                source_dirs = [source_dirs]
+            
+            # Count total files to process
+            total_files = 0
+            for dir_path in source_dirs:
+                expanded_path = Path(dir_path).expanduser()
+                if expanded_path.exists() and expanded_path.is_dir():
+                    # Count files in directory
+                    total_files += sum(1 for _ in expanded_path.glob('*') if _.is_file())
+            
+            self.status_signal.emit(f"Processing {total_files} files...")
+            
+            # Custom file handler that emits progress
+            class ProgressFileHandler(FileHandler):
+                def __init__(self, config, progress_callback, abort_check):
+                    super().__init__(config)
+                    self.progress_callback = progress_callback
+                    self.abort_check = abort_check
+                    self.processed_count = 0
+                
+                def process_file(self, file_path):
+                    # Check if abort was requested
+                    if self.abort_check():
+                        return False
+                    
+                    result = super().process_file(file_path)
+                    if result:
+                        self.processed_count += 1
+                        self.progress_callback(self.processed_count, total_files)
+                    return result
+            
+            # Create progress-aware file handler
+            progress_handler = ProgressFileHandler(
+                self.config, 
+                self.progress_signal.emit,
+                lambda: self.abort_flag
+            )
+            
+            # Process each source directory
+            for dir_path in source_dirs:
+                if self.abort_flag:
+                    break
+                    
+                expanded_path = Path(dir_path).expanduser()
+                if expanded_path.exists() and expanded_path.is_dir():
+                    self.status_signal.emit(f"Processing directory: {expanded_path}")
+                    progress_handler.process_directory(expanded_path)
+                else:
+                    logger.warning(f"Source directory does not exist: {expanded_path}")
+            
+            if self.abort_flag:
+                self.status_signal.emit("Operation canceled")
+            else:
+                self.finished_signal.emit(progress_handler.processed_count)
+            
+        except Exception as e:
+            logger.error(f"Error in worker thread: {e}")
+            self.error_signal.emit(str(e))
+    
+    def abort(self):
+        """Set flag to abort processing."""
+        self.abort_flag = True
+        self.status_signal.emit("Canceling operation...")
+
+
+class FileFlowUI(QMainWindow):
+    """Main window for the SELO FileFlow UI."""
+    
+    def __init__(self, config_manager=None, config_path=None):
+        """
+        Initialize the main window.
+        
+        Args:
+            config_manager (ConfigManager, optional): A config manager instance.
+            config_path (str, optional): Path to the configuration file.
+        """
+        super().__init__()
+        
+        # CRITICAL FIX: Apply aggressive Windows icon handling before initializing UI
+        if sys.platform == 'win32':
+            try:
+                # Load icon directly from file
+                icon_path = os.path.abspath(os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    'resources', 'icon.ico'
+                ))
+                
+                if os.path.exists(icon_path):
+                    # Import needed modules
+                    import ctypes
+                    
+                    # Set application ID for proper taskbar grouping
+                    app_id = 'SELOdev.FileFlow.App.1.0'
+                    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+                    
+                    # Store icon path for later use when the window is actually visible
+                    self.icon_path = icon_path
+                    print(f"Will apply icon from: {icon_path} when window is shown")
+            except Exception as e:
+                print(f"Failed to apply icon fix: {e}")
+        
+        # Set up config manager
+        if config_manager:
+            self.config_manager = config_manager
+        elif config_path:
+            self.config_manager = ConfigManager(Path(config_path))
+        else:
+            default_config_path = Path(__file__).parent.parent.parent / 'config' / 'settings.yaml'
+            self.config_manager = ConfigManager(default_config_path)
+        
+        self.config = self.config_manager.get_config()
+        
+        # Set up file handler
+        self.file_handler = FileHandler(self.config)
+        
+        # Set up UI components
+        self._init_ui()
+        
+        # Set window icon
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'icon.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
+        # Set up system tray
+        self._setup_tray()
+        
+        # Set up timer for status updates
+        self.status_timer = QTimer()
+        self.status_timer.setInterval(10000)  # 10 seconds
+        self.status_timer.timeout.connect(self._update_status)
+        self.status_timer.start()
+        
+        # Load initial data
+        self._load_config_to_ui()
+    
+    def _set_application_icon(self):
+        """Set the application icon with enhanced handling for PyInstaller environments."""
+        try:
+            # Determine if we're running in a PyInstaller bundle
+            is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+            
+            if is_frozen:
+                # PyInstaller-specific path handling
+                base_dir = sys._MEIPASS
+                icon_path = os.path.join(base_dir, 'icon.ico')
+                if not os.path.exists(icon_path):
+                    # Try to find icon in resource directory embedded by PyInstaller
+                    icon_path = os.path.join(base_dir, 'resources', 'icon.ico')
+            else:
+                # Standard path for development environment
+                icon_path = os.path.abspath(os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    'resources', 'icon.ico'
+                ))
+            
+            # Debug the icon path
+            print(f"Looking for icon at: {icon_path}")
+            
+            # Check if icon exists
+            if os.path.exists(icon_path):
+                # Create icon and apply at multiple levels
+                icon = QIcon(icon_path)
+                
+                # Apply icon to the window (standard method)
+                self.setWindowIcon(icon)
+                
+                # Apply icon to the application (needed for taskbar)
+                QApplication.instance().setWindowIcon(icon)
+                
+                # For Windows, try additional methods
+                if sys.platform == 'win32':
+                    try:
+                        import ctypes
+                        # Set application ID for proper taskbar grouping
+                        app_id = 'SELOdev.FileFlow.App.1.0'
+                        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+                        
+                        # Try Win32 specific methods if available
+                        try:
+                            import win32gui
+                            import win32con
+                            import win32api
+                            
+                            # Force icon refresh in taskbar
+                            self.winId()  # Ensure window has a valid ID
+                            hwnd = int(self.winId())
+                            win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, 
+                                            win32gui.LoadImage(None, icon_path, win32con.IMAGE_ICON, 
+                                                            0, 0, win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE))
+                            win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, 
+                                            win32gui.LoadImage(None, icon_path, win32con.IMAGE_ICON, 
+                                                            16, 16, win32con.LR_LOADFROMFILE))
+                        except ImportError:
+                            print("Win32 extensions not available for enhanced icon handling")
+                    except Exception as e:
+                        print(f"Windows-specific icon handling failed: {e}")
+                
+                print(f"Successfully set icon from: {icon_path}")
+                return True
+            else:
+                print(f"WARNING: Icon file not found at: {icon_path}")
+                return False
+                
+        except Exception as e:
+            print(f"Error setting application icon: {e}")
+            return False
+    
+    def _init_ui(self):
+        """Initialize the UI components."""
+        # Set window properties
+        self.setWindowTitle("FileFlow")
+        self.resize(800, 600)
+        
+        # Set window icon - important for title bar
+        self._set_application_icon()
+        
+        # Create central widget and layout
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Create tab widget
+        tab_widget = QTabWidget()
+        
+        # Create tabs
+        self.folders_tab = self._create_folders_tab()
+        self.file_types_tab = self._create_file_types_tab()
+        self.settings_tab = self._create_settings_tab()
+        
+        # Add tabs to tab widget
+        tab_widget.addTab(self.folders_tab, "Folders")
+        tab_widget.addTab(self.file_types_tab, "File Types")
+        tab_widget.addTab(self.settings_tab, "Settings")
+        
+        # Add tab widget to main layout
+        main_layout.addWidget(tab_widget)
+        
+        # Create bottom bar with status and buttons
+        bottom_bar = QHBoxLayout()
+        
+        # Status label
+        self.status_label = QLabel("Ready")
+        bottom_bar.addWidget(self.status_label)
+        
+        # Spacer
+        bottom_bar.addStretch()
+        
+        # Buttons
+        self.process_now_btn = QPushButton("Process Now")
+        self.process_now_btn.clicked.connect(self._process_now)
+        bottom_bar.addWidget(self.process_now_btn)
+        
+        self.save_btn = QPushButton("Save Configuration")
+        self.save_btn.clicked.connect(self._save_config)
+        bottom_bar.addWidget(self.save_btn)
+        
+        # Add bottom bar to main layout
+        main_layout.addLayout(bottom_bar)
+        
+        # Set central widget
+        self.setCentralWidget(central_widget)
+    
+    def _create_folders_tab(self):
+        """Create the folders tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # Source directories section
+        source_group = QGroupBox("Source Directories")
+        source_layout = QVBoxLayout(source_group)
+        
+        # List of source directories
+        self.source_list = QListWidget()
+        self.source_list.setSelectionMode(QListWidget.ExtendedSelection)
+        source_layout.addWidget(self.source_list)
+        
+        # Buttons for source directories
+        source_buttons = QHBoxLayout()
+        
+        add_source_btn = QPushButton("Add Folder")
+        add_source_btn.clicked.connect(partial(self._add_folder, self.source_list, "source"))
+        source_buttons.addWidget(add_source_btn)
+        
+        remove_source_btn = QPushButton("Remove Selected")
+        remove_source_btn.clicked.connect(partial(self._remove_selected, self.source_list, "source"))
+        source_buttons.addWidget(remove_source_btn)
+        
+        source_layout.addLayout(source_buttons)
+        
+        # Destination directories section
+        dest_group = QGroupBox("Destination Directories")
+        dest_layout = QFormLayout(dest_group)
+        
+        # Create inputs for each destination category
+        self.dest_inputs = {}
+        for category in ["images", "documents", "videos", "software", "other"]:
+            row_layout = QHBoxLayout()
+            
+            # Path input
+            path_input = QLineEdit()
+            path_input.setReadOnly(True)
+            row_layout.addWidget(path_input, 1)
+            
+            # Browse button
+            browse_btn = QPushButton("Browse...")
+            browse_btn.clicked.connect(partial(self._browse_folder, path_input, category))
+            row_layout.addWidget(browse_btn)
+            
+            # Add to form
+            dest_layout.addRow(f"{category.capitalize()}:", row_layout)
+            
+            # Save reference
+            self.dest_inputs[category] = path_input
+        
+        # Add groups to tab layout
+        layout.addWidget(source_group)
+        layout.addWidget(dest_group)
+        
+        return tab
+    
+    def _create_file_types_tab(self):
+        """Create the file types tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # File type mapping section
+        self.file_type_widgets = {}
+        
+        for category in ["images", "documents", "videos", "software", "other"]:
+            group = QGroupBox(f"{category.capitalize()} File Types")
+            group_layout = QVBoxLayout(group)
+            
+            # List of file extensions
+            list_widget = QListWidget()
+            list_widget.setSelectionMode(QListWidget.ExtendedSelection)
+            group_layout.addWidget(list_widget)
+            
+            # Buttons
+            buttons_layout = QHBoxLayout()
+            
+            add_btn = QPushButton("Add Extension")
+            add_btn.clicked.connect(partial(self._add_extension, list_widget, category))
+            buttons_layout.addWidget(add_btn)
+            
+            remove_btn = QPushButton("Remove Selected")
+            remove_btn.clicked.connect(partial(self._remove_extension, list_widget, category))
+            buttons_layout.addWidget(remove_btn)
+            
+            group_layout.addLayout(buttons_layout)
+            
+            # Add to tab layout
+            layout.addWidget(group)
+            
+            # Save reference
+            self.file_type_widgets[category] = list_widget
+        
+        return tab
+    
+    def _create_settings_tab(self):
+        """Create the settings tab."""
+        tab = QWidget()
+        layout = QFormLayout(tab)
+        
+        # Move files checkbox
+        self.move_files_cb = QCheckBox("Move files (instead of copying)")
+        layout.addRow(self.move_files_cb)
+        
+        # Organize existing files checkbox
+        self.organize_existing_cb = QCheckBox("Organize existing files when starting")
+        layout.addRow(self.organize_existing_cb)
+        
+        # Notify on move checkbox
+        self.notify_cb = QCheckBox("Show notification when files are organized")
+        layout.addRow(self.notify_cb)
+        
+        # Auto-start with Windows checkbox
+        self.autostart_cb = QCheckBox("Start automatically with Windows")
+        layout.addRow(self.autostart_cb)
+        
+        # Check interval
+        interval_layout = QHBoxLayout()
+        self.check_interval_spin = QSpinBox()
+        self.check_interval_spin.setMinimum(1)
+        self.check_interval_spin.setMaximum(60)
+        self.check_interval_spin.setValue(1)
+        interval_layout.addWidget(self.check_interval_spin)
+        interval_layout.addWidget(QLabel("minutes"))
+        layout.addRow("Check interval:", interval_layout)
+        
+        # Add Apply button
+        self.apply_btn = QPushButton("Apply Settings")
+        self.apply_btn.clicked.connect(self._apply_settings)
+        layout.addRow(self.apply_btn)
+        
+        return tab
+    
+    def _setup_tray(self):
+        """Set up system tray icon and menu."""
+        self.tray_icon = QSystemTrayIcon(self)
+        
+        # Load the application icon
+        icon_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'icon.ico'))
+        if os.path.exists(icon_path):
+            icon = QIcon(icon_path)
+            self.tray_icon.setIcon(icon)
+            # Set tooltip explicitly to ensure it shows FileFlow
+            self.tray_icon.setToolTip("FileFlow")
+            print(f"Tray icon set from: {icon_path}")
+        else:
+            print(f"Warning: Tray icon not found at {icon_path}")
+            # Create a fallback icon
+            pixmap = QPixmap(QSize(64, 64))
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.setPen(Qt.blue)
+            painter.setFont(QFont("Arial", 20, QFont.Bold))
+            painter.drawText(pixmap.rect(), Qt.AlignCenter, "FF")
+            painter.end()
+            self.tray_icon.setIcon(QIcon(pixmap))
+        
+        # Create tray menu
+        tray_menu = QMenu()
+        
+        # Add actions
+        show_action = QAction("Show Window", self)
+        show_action.triggered.connect(self.show)
+        tray_menu.addAction(show_action)
+        
+        process_action = QAction("Process Now", self)
+        process_action.triggered.connect(self._process_now)
+        tray_menu.addAction(process_action)
+        
+        tray_menu.addSeparator()
+        
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self._exit_app)
+        tray_menu.addAction(exit_action)
+        
+        # Set the menu
+        self.tray_icon.setContextMenu(tray_menu)
+        
+        # Show the tray icon
+        self.tray_icon.show()
+        
+        # Connect activation signal
+        self.tray_icon.activated.connect(self._tray_activated)
+    
+    def _create_placeholder_icon(self):
+        """Load the application icon from resources folder."""
+        # Try to load the actual icon file
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'icon.ico')
+        
+        if os.path.exists(icon_path):
+            return QIcon(icon_path)
+        else:
+            # Fallback to a simple placeholder if icon not found
+            print(f"Warning: Icon file not found at {icon_path}")
+            pixmap = QPixmap(QSize(64, 64))
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.setPen(Qt.blue)
+            painter.setFont(QFont("Arial", 20, QFont.Bold))
+            painter.drawText(pixmap.rect(), Qt.AlignCenter, "FF")
+            painter.end()
+            return QIcon(pixmap)
+    
+    def _tray_activated(self, reason):
+        """Handle tray icon activation."""
+        if reason == QSystemTrayIcon.DoubleClick:
+            self.show()
+            self.activateWindow()
+    
+    def _exit_app(self):
+        """Exit the application."""
+        self._save_config()
+        QApplication.quit()
+    
+    def showEvent(self, event):
+        """Handle the window show event - apply icon fixes when window is visible."""
+        super().showEvent(event)
+        
+        # Fix title bar icon when window is actually shown and visible
+        if hasattr(self, 'icon_path') and os.path.exists(self.icon_path):
+            try:
+                # Set icon multiple ways to ensure it's picked up
+                app_icon = QIcon(self.icon_path)
+                self.setWindowIcon(app_icon)
+                QApplication.instance().setWindowIcon(app_icon)
+                
+                # Use native Windows API if available
+                if sys.platform == 'win32':
+                    try:
+                        import ctypes
+                        from ctypes import windll
+                        # Try forcing icon refresh with Windows API
+                        hwnd = int(self.winId())
+                        windll.user32.SendMessageW(hwnd, 0x0080, 0, 0)  # WM_SETICON
+                    except Exception as e:
+                        print(f"Windows icon API error: {e}")
+                        
+                print("Applied icon to visible window")
+            except Exception as e:
+                print(f"Error setting window icon: {e}")
+    
+    def closeEvent(self, event):
+        """Handle the window close event."""
+        if self.tray_icon.isVisible():
+            # Hide to tray instead of closing
+            self.hide()
+            # DIRECT FIX: Force the notification title to be FileFlow
+            self.tray_icon.showMessage(
+                "FileFlow", # Fixed title
+                "FileFlow is still running in the background.", # Fixed message
+                QSystemTrayIcon.Information,
+                3000
+            )
+            event.ignore()
+        else:
+            # Actually close
+            self._save_config()
+            event.accept()
+    
+    def _show_tray_message(self, message, title=None, icon=QSystemTrayIcon.Information, duration=3000):
+        """Show a message from the tray icon.
+        
+        Args:
+            message: The message text to display
+            title: The title of the notification (defaults to "FileFlow")
+            icon: The icon type to display (Information, Warning, Critical)
+            duration: How long to show the notification in milliseconds
+        """
+        # CRITICAL FIX: Force the title to always be FileFlow, no matter what
+        title = "FileFlow"  # Hard-coded to ensure consistency
+            
+        # CRITICAL FIX: Make sure there is no trace of Download Organizer in the message
+        if message and ("download" in message.lower() or "organizer" in message.lower()):
+            message = message.replace("Download Organizer", "FileFlow")
+            message = message.replace("download organizer", "FileFlow")
+            message = message.replace("DownloadOrganizer", "FileFlow")
+            
+        print(f"Showing notification with fixed title: {title}")
+        print(f"Notification message: {message}")
+        
+        # Show the message with hard-coded title
+        self.tray_icon.showMessage(title, message, icon, duration)
+    
+    def _load_config_to_ui(self):
+        """Load configuration data into the UI."""
+        # Source directories
+        source_dir = self.config.get('source_directory', '')
+        if source_dir:
+            # Convert to list if it's a single string
+            if isinstance(source_dir, str):
+                source_dirs = [source_dir]
+            else:
+                source_dirs = source_dir
+            
+            # Add to list
+            for dir_path in source_dirs:
+                expanded_path = str(Path(dir_path).expanduser())
+                self.source_list.addItem(expanded_path)
+        
+        # Destination directories
+        dest_dirs = self.config.get('destination_directories', {})
+        for category, path in dest_dirs.items():
+            if category in self.dest_inputs:
+                expanded_path = str(Path(path).expanduser())
+                self.dest_inputs[category].setText(expanded_path)
+        
+        # File type mappings
+        file_types = self.config.get('file_types', {})
+        for category, extensions in file_types.items():
+            if category in self.file_type_widgets:
+                list_widget = self.file_type_widgets[category]
+                list_widget.clear()
+                for ext in extensions:
+                    list_widget.addItem(ext)
+        
+        # Settings
+        self.move_files_cb.setChecked(self.config.get('move_files', True))
+        self.organize_existing_cb.setChecked(self.config.get('organize_existing_files', True))
+        self.notify_cb.setChecked(self.config.get('notify_on_move', True))
+        
+        # Check if we're set to auto-start
+        # This is a Windows-specific implementation
+        import winreg
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_READ
+            )
+            winreg.QueryValueEx(key, "SELOFileFlow")
+            self.autostart_cb.setChecked(True)
+        except:
+            self.autostart_cb.setChecked(False)
+        
+        # Check interval
+        self.check_interval_spin.setValue(self.config.get('check_interval_minutes', 1))
+    
+    def _update_config_from_ui(self):
+        """Update configuration from UI inputs."""
+        # Source directories - support multiple folders
+        source_dirs = []
+        for i in range(self.source_list.count()):
+            source_dirs.append(self.source_list.item(i).text())
+        
+        # If only one source directory, store as string for backward compatibility
+        if len(source_dirs) == 1:
+            self.config['source_directory'] = source_dirs[0]
+        elif len(source_dirs) > 1:
+            # Store as list for multiple directories
+            self.config['source_directory'] = source_dirs
+        
+        # Destination directories
+        for category, input_widget in self.dest_inputs.items():
+            path = input_widget.text()
+            if path:
+                self.config['destination_directories'][category] = path
+        
+        # File type mappings
+        for category, list_widget in self.file_type_widgets.items():
+            extensions = []
+            for i in range(list_widget.count()):
+                extensions.append(list_widget.item(i).text())
+            self.config['file_types'][category] = extensions
+        
+        # Settings
+        self.config['move_files'] = self.move_files_cb.isChecked()
+        self.config['organize_existing_files'] = self.organize_existing_cb.isChecked()
+        self.config['notify_on_move'] = self.notify_cb.isChecked()
+        self.config['check_interval_minutes'] = self.check_interval_spin.value()
+    
+    def _save_config(self):
+        """Save configuration to file."""
+        try:
+            self._update_config_from_ui()
+            self.config_manager.update_config(self.config)
+            self._show_status("Configuration saved successfully")
+        except Exception as e:
+            logger.error(f"Error saving configuration: {e}")
+            QMessageBox.warning(self, "Error", f"Could not save configuration: {e}")
+    
+    def _apply_settings(self):
+        """Apply settings from the settings tab."""
+        # Handle auto-start setting
+        self._set_autostart(self.autostart_cb.isChecked())
+        
+        # Save other settings
+        self._save_config()
+        
+        # Show confirmation
+        QMessageBox.information(self, "Settings Applied", "Settings have been applied successfully.")
+    
+    def _set_autostart(self, enabled):
+        """Set or remove auto-start registry entry."""
+        import winreg
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER, key_path, 0,
+                winreg.KEY_WRITE
+            )
+            
+            if enabled:
+                # Get the path to the current executable
+                exe_path = sys.executable
+                script_path = os.path.abspath(os.path.join(
+                    os.path.dirname(__file__), '..', '..', 'run_fileflow.py'
+                ))
+                
+                # Create the command to run at startup
+                command = f'"{exe_path}" "{script_path}" --minimized'
+                
+                # Add to registry
+                winreg.SetValueEx(key, "SELOFileFlow", 0, winreg.REG_SZ, command)
+                logger.info("Added SELO FileFlow to startup")
+            else:
+                # Remove from registry
+                try:
+                    winreg.DeleteValue(key, "SELOFileFlow")
+                    logger.info("Removed SELO FileFlow from startup")
+                except:
+                    # Key might not exist
+                    pass
+                
+            winreg.CloseKey(key)
+        except Exception as e:
+            logger.error(f"Error setting auto-start: {e}")
+            QMessageBox.warning(self, "Error", f"Could not set auto-start: {e}")
+    
+    def _add_folder(self, list_widget, folder_type):
+        """Add a folder to the list."""
+        folder = QFileDialog.getExistingDirectory(
+            self, f"Select {folder_type.capitalize()} Directory",
+            str(Path.home())
+        )
+        
+        if folder:
+            list_widget.addItem(folder)
+    
+    def _remove_selected(self, list_widget, folder_type):
+        """Remove selected folders from the list."""
+        selected_items = list_widget.selectedItems()
+        for item in selected_items:
+            list_widget.takeItem(list_widget.row(item))
+    
+    def _browse_folder(self, line_edit, category):
+        """Browse for a folder and set the path in the line edit."""
+        folder = QFileDialog.getExistingDirectory(
+            self, f"Select {category.capitalize()} Directory",
+            line_edit.text() or str(Path.home())
+        )
+        
+        if folder:
+            line_edit.setText(folder)
+    
+    def _add_extension(self, list_widget, category):
+        """Add a file extension to the list."""
+        # Simple dialog to input extension
+        from PyQt5.QtWidgets import QInputDialog
+        
+        extension, ok = QInputDialog.getText(
+            self, f"Add {category.capitalize()} Extension",
+            "Enter file extension (include the dot, e.g. '.pdf'):"
+        )
+        
+        if ok and extension:
+            # Validate extension
+            if not extension.startswith('.'):
+                extension = '.' + extension
+            
+            # Add to list
+            list_widget.addItem(extension.lower())
+    
+    def _remove_extension(self, list_widget, category):
+        """Remove selected extensions from the list."""
+        selected_items = list_widget.selectedItems()
+        for item in selected_items:
+            list_widget.takeItem(list_widget.row(item))
+    
+    def _process_now(self):
+        """Process files in the source directories now using a background thread."""
+        try:
+            # Get latest config
+            self._update_config_from_ui()
+            
+            # Create a progress dialog
+            progress_dialog = QProgressDialog("Preparing to process files...", "Cancel", 0, 100, self)
+            progress_dialog.setWindowTitle("FileFlow - Processing Files")
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setAutoClose(True)
+            progress_dialog.setMinimumDuration(0)  # Show immediately
+            
+            # Create worker thread
+            self.worker = FileProcessWorker(self.config)
+            
+            # Connect signals
+            self.worker.progress_signal.connect(self._update_progress)
+            self.worker.status_signal.connect(progress_dialog.setLabelText)
+            self.worker.finished_signal.connect(lambda count: self._processing_finished(count, progress_dialog))
+            self.worker.error_signal.connect(lambda err: self._processing_error(err, progress_dialog))
+            
+            # Connect cancel button
+            progress_dialog.canceled.connect(self.worker.abort)
+            
+            # Start processing
+            self.worker.start()
+            
+            # Show toast notification that processing has started
+            if self.config.get('notify_on_move', True):
+                self._show_tray_message("FileFlow is organizing your files...")
+            
+            # Show the dialog
+            progress_dialog.show()
+            
+        except Exception as e:
+            logger.error(f"Error starting file processing: {e}")
+            self._show_status(f"Error: {e}")
+            QMessageBox.warning(self, "Error", f"Could not process files: {e}")
+    
+    def _update_progress(self, current, total):
+        """Update progress dialog with current progress."""
+        if total > 0:
+            percent = int((current / total) * 100)
+            # Find the progress dialog
+            for widget in QApplication.topLevelWidgets():
+                if isinstance(widget, QProgressDialog):
+                    widget.setValue(percent)
+                    widget.setLabelText(f"Processing files: {current}/{total} ({percent}%)")
+                    break
+    
+    def _processing_finished(self, count, progress_dialog):
+        """Handle completion of file processing."""
+        message = f"Processed {count} files successfully."
+        self._show_status(message)
+        
+        # Close the progress dialog if it's still open
+        if progress_dialog and progress_dialog.isVisible():
+            progress_dialog.close()
+        
+        # Show notification
+        if self.config.get('notify_on_move', True):
+            self._show_tray_message(message, "FileFlow - Complete")
+    
+    def _processing_error(self, error_message, progress_dialog):
+        """Handle errors during file processing."""
+        logger.error(f"Error processing files: {error_message}")
+        self._show_status(f"Error: {error_message}")
+        
+        # Close the progress dialog if it's still open
+        if progress_dialog and progress_dialog.isVisible():
+            progress_dialog.close()
+            
+        # Show error message
+        QMessageBox.warning(self, "Error", f"Error processing files: {error_message}")
+        
+        # Show notification
+        if self.config.get('notify_on_move', True):
+            self._show_tray_message(f"Error: {error_message}", "FileFlow - Error")
+    
+    def _update_status(self):
+        """Update the status label with current info."""
+        # Just update the time for now
+        import datetime
+        now = datetime.datetime.now().strftime("%H:%M:%S")
+        self.status_label.setText(f"Last check: {now}")
+    
+    def _show_status(self, message):
+        """Show a message in the status bar."""
+        self.status_label.setText(message)
+
+
+def run_ui(config_path=None):
+    """
+    Run the FileFlow UI.
+    
+    Args:
+        config_path (str, optional): Path to the configuration file.
+    """
+    app = QApplication(sys.argv)
+    app.setApplicationName("FileFlow")
+    
+    # Set application icon for all windows
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'icon.ico')
+    if os.path.exists(icon_path):
+        app_icon = QIcon(icon_path)
+        app.setWindowIcon(app_icon)
+        
+        # More explicit way to set the icon for all windows
+        from PyQt5.QtCore import Qt
+        app.setAttribute(Qt.AA_UseHighDpiPixmaps)  # For better scaling on high DPI displays
+        
+        # Print for debugging
+        print(f"Setting application icon from: {icon_path}")
+    
+    # Set app style
+    app.setStyle("Fusion")
+    
+    # Create and show the main window
+    main_window = FileFlowUI(config_path=config_path)
+    
+    # Check for --minimized flag
+    if "--minimized" in sys.argv:
+        # Start minimized to tray
+        pass
+    else:
+        main_window.show()
+    
+    # Run the app
+    sys.exit(app.exec_())
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: user_dirs.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 4127 bytes 
+LAST MODIFIED: 05/25/2025 09:19 PM 
+----------------------------------------------------------------- 
+ 
+"""
+User directory management for FileFlow application.
+Handles the creation and management of user-specific data directories.
+"""
+import os
+import sys
+from pathlib import Path
+from typing import Self, Literal
+
+# Type definitions using Python 3.13 features
+DirType = Literal['config', 'logs', 'data', 'cache']
+
+class UserDirectories:
+    """Manages user-specific directories for the application."""
+    
+    _instance: Self | None = None
+    
+    def __new__(cls) -> Self:
+        """Singleton pattern to ensure only one instance exists."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self) -> None:
+        """Initialize user directories."""
+        if getattr(self, "_initialized", False):
+            return
+            
+        # Determine if running as packaged application
+        self.is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+        self.is_windows = sys.platform == 'win32'
+        
+        # Set up base directories
+        if self.is_frozen:
+            # For packaged application, use appropriate user directories
+            if self.is_windows:
+                # Windows: Use AppData
+                self.base_user_dir = Path(os.environ.get('APPDATA', '')) / "SELOdev" / "FileFlow"
+            else:
+                # Unix/Linux/Mac: Use ~/.fileflow
+                self.base_user_dir = Path(os.path.expanduser("~")) / ".fileflow"
+                
+            # Get the application directory (where the executable is)
+            if self.is_frozen:
+                self.app_dir = Path(sys._MEIPASS)
+            else:
+                self.app_dir = Path(__file__).parent.parent.parent
+        else:
+            # For development, use project directory
+            self.app_dir = Path(__file__).parent.parent.parent
+            self.base_user_dir = self.app_dir
+        
+        # Create specific directories
+        self.dirs = {
+            'config': self.base_user_dir / "config",
+            'logs': self.base_user_dir / "logs",
+            'data': self.base_user_dir / "data",
+            'cache': self.base_user_dir / "cache"
+        }
+        
+        self._initialized = True
+    
+    def get_dir(self, dir_type: DirType, create: bool = True) -> Path:
+        """
+        Get a specific user directory path.
+        
+        Args:
+            dir_type: Type of directory ('config', 'logs', 'data', 'cache')
+            create: Whether to create the directory if it doesn't exist
+            
+        Returns:
+            Path to the requested directory
+        """
+        dir_path = self.dirs.get(dir_type)
+        if dir_path is None:
+            raise ValueError(f"Invalid directory type: {dir_type}")
+            
+        if create and not dir_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+            
+        return dir_path
+    
+    def get_file_path(self, dir_type: DirType, filename: str, create_dir: bool = True) -> Path:
+        """
+        Get the path to a file within a user directory.
+        
+        Args:
+            dir_type: Type of directory ('config', 'logs', 'data', 'cache')
+            filename: Name of the file
+            create_dir: Whether to create the directory if it doesn't exist
+            
+        Returns:
+            Path to the file
+        """
+        return self.get_dir(dir_type, create_dir) / filename
+    
+    def is_protected_directory(self, path: str | Path) -> bool:
+        """
+        Check if a path is in a protected directory that requires admin privileges.
+        
+        Args:
+            path: The path to check
+            
+        Returns:
+            True if the path is in a protected directory, False otherwise
+        """
+        path_str = str(path).lower()
+        protected_dirs = [
+            "program files", 
+            "program files (x86)", 
+            "windows", 
+            "system32"
+        ]
+        
+        return any(protected_dir in path_str for protected_dir in protected_dirs)
+
+# Singleton instance
+user_dirs = UserDirectories()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: __init__.py 
+PATH: E:\GitHub\SELO-FileFlow\src\modules\ 
+SIZE: 96 bytes 
+LAST MODIFIED: 05/24/2025 03:20 PM 
+----------------------------------------------------------------- 
+ 
+# Modules package
+"""
+Contains the core functionality modules for the FileFlow application.
+"""
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: test_file_handler.py 
+PATH: E:\GitHub\SELO-FileFlow\tests\ 
+SIZE: 5440 bytes 
+LAST MODIFIED: 05/23/2025 11:40 PM 
+----------------------------------------------------------------- 
+ 
+"""
+Tests for the file_handler module.
+"""
+
+import os
+import shutil
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from src.modules.file_handler import FileHandler
+
+class TestFileHandler(unittest.TestCase):
+    """Test cases for the FileHandler class."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        # Create temporary directories for testing
+        self.temp_dir = TemporaryDirectory()
+        self.source_dir = Path(self.temp_dir.name) / "downloads"
+        self.source_dir.mkdir()
+        
+        # Create destination directories
+        self.images_dir = Path(self.temp_dir.name) / "images"
+        self.documents_dir = Path(self.temp_dir.name) / "documents"
+        self.videos_dir = Path(self.temp_dir.name) / "videos"
+        self.software_dir = Path(self.temp_dir.name) / "software"
+        self.other_dir = Path(self.temp_dir.name) / "other"
+        
+        for dir_path in [self.images_dir, self.documents_dir, self.videos_dir, 
+                         self.software_dir, self.other_dir]:
+            dir_path.mkdir()
+        
+        # Create test config
+        self.config = {
+            'source_directory': str(self.source_dir),
+            'destination_directories': {
+                'images': str(self.images_dir),
+                'documents': str(self.documents_dir),
+                'videos': str(self.videos_dir),
+                'software': str(self.software_dir),
+                'other': str(self.other_dir)
+            },
+            'file_types': {
+                'images': ['.jpg', '.png', '.gif'],
+                'documents': ['.pdf', '.doc', '.txt'],
+                'videos': ['.mp4', '.avi', '.mkv'],
+                'software': ['.exe', '.msi', '.zip']
+            },
+            'move_files': True
+        }
+        
+        # Create file handler
+        self.file_handler = FileHandler(self.config)
+    
+    def tearDown(self):
+        """Clean up test environment."""
+        self.temp_dir.cleanup()
+    
+    def test_get_file_category(self):
+        """Test get_file_category method."""
+        # Test image file
+        image_path = Path("test.jpg")
+        self.assertEqual(self.file_handler.get_file_category(image_path), 'images')
+        
+        # Test document file
+        doc_path = Path("test.pdf")
+        self.assertEqual(self.file_handler.get_file_category(doc_path), 'documents')
+        
+        # Test video file
+        video_path = Path("test.mp4")
+        self.assertEqual(self.file_handler.get_file_category(video_path), 'videos')
+        
+        # Test software file
+        software_path = Path("test.exe")
+        self.assertEqual(self.file_handler.get_file_category(software_path), 'software')
+        
+        # Test other file
+        other_path = Path("test.unknown")
+        self.assertEqual(self.file_handler.get_file_category(other_path), 'other')
+    
+    def test_process_file(self):
+        """Test process_file method."""
+        # Create test files
+        test_files = {
+            'image.jpg': 'images',
+            'document.pdf': 'documents',
+            'video.mp4': 'videos',
+            'software.exe': 'software',
+            'other.xyz': 'other'
+        }
+        
+        for filename, _ in test_files.items():
+            file_path = self.source_dir / filename
+            with open(file_path, 'w') as f:
+                f.write("test content")
+        
+        # Process each file
+        for filename, category in test_files.items():
+            file_path = self.source_dir / filename
+            self.assertTrue(self.file_handler.process_file(file_path))
+            
+            # Check if file was moved to correct category
+            dest_dir = getattr(self, f"{category}_dir")
+            dest_file = dest_dir / filename
+            self.assertTrue(dest_file.exists())
+            
+            # Check if file is no longer in source directory
+            self.assertFalse(file_path.exists())
+    
+    def test_process_file_copy_mode(self):
+        """Test process_file method with copy mode."""
+        # Set move_files to False
+        self.file_handler.move_files = False
+        
+        # Create test file
+        file_path = self.source_dir / "test.jpg"
+        with open(file_path, 'w') as f:
+            f.write("test content")
+        
+        # Process file
+        self.assertTrue(self.file_handler.process_file(file_path))
+        
+        # Check if file was copied to images directory
+        dest_file = self.images_dir / "test.jpg"
+        self.assertTrue(dest_file.exists())
+        
+        # Check if file is still in source directory
+        self.assertTrue(file_path.exists())
+    
+    def test_process_directory(self):
+        """Test process_directory method."""
+        # Create test files in source directory
+        file_types = ['.jpg', '.pdf', '.mp4', '.exe', '.xyz']
+        for i, ext in enumerate(file_types):
+            file_path = self.source_dir / f"test{i}{ext}"
+            with open(file_path, 'w') as f:
+                f.write("test content")
+        
+        # Process directory
+        processed_count = self.file_handler.process_directory(self.source_dir)
+        
+        # Check if all files were processed
+        self.assertEqual(processed_count, len(file_types))
+        
+        # Check if source directory is empty
+        self.assertEqual(len(list(self.source_dir.iterdir())), 0)
+
+
+if __name__ == '__main__':
+    unittest.main()
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: __init__.py 
+PATH: E:\GitHub\SELO-FileFlow\tests\ 
+SIZE: 28 bytes 
+LAST MODIFIED: 05/24/2025 03:20 PM 
+----------------------------------------------------------------- 
+ 
+# Test package for FileFlow
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: build_complete.bat 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 237 bytes 
+LAST MODIFIED: 05/24/2025 04:48 PM 
+----------------------------------------------------------------- 
+ 
+@echo off
+echo Building SELO FileFlow...
+python build_app.py > build_log.txt 2>&1
+echo Build completed. See build_log.txt for details.
+echo.
+echo Creating installer...
+python create_fileflow_installer.py >> build_log.txt 2>&1
+echo Done!
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: install_dependencies.bat 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 883 bytes 
+LAST MODIFIED: 05/24/2025 12:40 AM 
+----------------------------------------------------------------- 
+ 
+@echo off
+echo ===================================
+echo SELO FileFlow - Setup Dependencies
+echo ===================================
+echo.
+
+echo Installing required Python packages...
+pip install -r requirements.txt
+pip install pyinstaller
+
+echo.
+echo Checking for development tools...
+
+where makensis >nul 2>&1
+if %errorlevel% neq 0 (
+    echo NSIS (Nullsoft Scriptable Install System) not found.
+    echo If you want to build Windows installers, please install NSIS from:
+    echo https://nsis.sourceforge.io/
+    echo.
+    echo After installation, make sure to add it to your PATH.
+) else (
+    echo NSIS found. You can build installers with build_installer.py
+)
+
+echo.
+echo Dependencies installation complete!
+echo.
+echo You can now:
+echo 1. Run the application with: python run_organizer.py --ui
+echo 2. Build a standalone executable with: python build_installer.py
+echo.
+
+pause
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: rename_project.bat 
+PATH: E:\GitHub\SELO-FileFlow\ 
+SIZE: 1114 bytes 
+LAST MODIFIED: 05/24/2025 12:39 AM 
+----------------------------------------------------------------- 
+ 
+@echo off
+echo ===================================
+echo SELO FileFlow - Directory Renaming
+echo ===================================
+echo.
+echo This script will rename the project directory from 'downloadorganizer' to 'SELO-FileFlow'
+echo.
+echo Please close any open files or applications that might be using files in this directory.
+echo.
+pause
+
+set PARENT_DIR=%~dp0..
+set OLD_PATH=%~dp0
+set NEW_PATH=%PARENT_DIR%\SELO-FileFlow
+
+echo.
+echo Moving files from:
+echo %OLD_PATH%
+echo To:
+echo %NEW_PATH%
+echo.
+
+if exist "%NEW_PATH%" (
+    echo ERROR: Destination directory already exists.
+    echo Please remove it first or choose a different name.
+    goto end
+)
+
+mkdir "%NEW_PATH%"
+xcopy "%OLD_PATH%*.*" "%NEW_PATH%" /E /H /C /I
+if %errorlevel% neq 0 (
+    echo Failed to copy files. Aborting.
+    goto end
+)
+
+echo.
+echo Directory renamed successfully!
+echo.
+echo Now you can:
+echo 1. Delete the old directory (after ensuring everything was copied correctly)
+echo 2. Navigate to the new directory at: %NEW_PATH%
+echo 3. Run the install_dependencies.bat script to set up the development environment
+echo.
+
+:end
+pause
+ 
+ 
+ 
+----------------------------------------------------------------- 
+FILE: run_as_service.ps1 
+PATH: E:\GitHub\SELO-FileFlow\scripts\ 
+SIZE: 2787 bytes 
+LAST MODIFIED: 05/24/2025 03:21 PM 
+----------------------------------------------------------------- 
+ 
+# PowerShell script to set up SELO FileFlow as a file watcher service
+# This creates a scheduled task that runs whenever a new file is created in the downloads folder
+
+$taskName = "SELOFileFlow"
+$pythonExe = "python"
+$workingDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$configPath = Join-Path $workingDir "config\settings.yaml"
+$downloadDir = [Environment]::GetFolderPath("UserProfile") + "\Downloads"
+$useUI = $true # Set to $true to use the graphical interface, $false to use command-line version
+
+# Try to read the config file to get the download directory
+try {
+    $configContent = Get-Content -Path $configPath -Raw
+    # Simple regex parsing to extract source_directory since powershell-yaml might not be available
+    if ($configContent -match "source_directory:\s*(.+)\s*") {
+        $sourceDir = $matches[1].Trim() -replace '~', $env:USERPROFILE
+        if ($sourceDir -match '^[A-Za-z]:\\') {
+            # It's already an absolute path
+            $downloadDir = $sourceDir
+        }
+    }
+} catch {
+    Write-Warning "Could not parse configuration. Using default Downloads folder: $downloadDir"
+}
+
+Write-Host "Setting up FileFlow as a file-triggered service..."
+Write-Host "Monitoring directory: $downloadDir"
+
+# Create the scheduled task action
+if ($useUI) {
+    # UI version with minimized flag
+    $taskAction = New-ScheduledTaskAction -Execute $pythonExe -Argument "run_organizer.py --ui --minimized --config `"$configPath`"" -WorkingDirectory $workingDir
+} else {
+    # CLI version with process-once flag
+    $taskAction = New-ScheduledTaskAction -Execute $pythonExe -Argument "run_organizer.py --process-once --config `"$configPath`"" -WorkingDirectory $workingDir
+}
+
+# Create task settings
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+# Use a simple trigger that runs periodically to check for new files
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+
+# Check if task already exists
+$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+
+if ($existingTask) {
+    # Update existing task
+    Set-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $trigger -Settings $settings
+    Write-Host "Updated existing scheduled task: $taskName"
+} else {
+    # Create new task
+    Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $trigger -Settings $settings -Description "Automatically organizes downloaded files into appropriate folders"
+    Write-Host "Created new scheduled task: $taskName"
+}
+
+Write-Host "Service setup complete! FileFlow will run automatically at logon."
+Write-Host "You can manually start it now by running: Start-ScheduledTask -TaskName $taskName"
+ 
+ 

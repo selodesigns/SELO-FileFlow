@@ -1,0 +1,15 @@
+# Core dependencies (cross-platform)
+watchdog>=2.1.6
+pyyaml>=6.0
+PyQt5>=5.15.9
+
+# Windows-specific dependencies (optional)
+# Install these on Windows for enhanced functionality:
+# pywin32>=306  # For Windows integration (win32api, win32gui, etc.)
+# winreg is built into Python on Windows
+
+# Linux-specific recommendations
+# On Linux, you may want to install these system packages:
+# sudo apt-get install python3-pyqt5 python3-yaml python3-watchdog  # Ubuntu/Debian
+# sudo dnf install python3-PyQt5 python3-pyyaml python3-watchdog     # Fedora
+# sudo pacman -S python-pyqt5 python-yaml python-watchdog            # Arch

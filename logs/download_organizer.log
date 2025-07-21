@@ -1,0 +1,2 @@
+2025-05-24 00:31:07,443 - src.ui_app - INFO - Starting DownloadOrganizer UI
+2025-05-24 00:31:07,509 - src.modules.config_manager - INFO - Configuration loaded successfully from E:\GitHub\downloadorganizer\config\settings.yaml

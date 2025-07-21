@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=FileFlow
+GenericName=File Organizer
+Comment=Automatically organize downloaded files by type and category
+Exec=python3 /mnt/Projects/GitHub/SELO-FileFlow/src/ui_app.py
+Icon=/mnt/Projects/GitHub/SELO-FileFlow/resources/icon.png
+StartupNotify=true
+Terminal=false
+Categories=Utility;FileManager;
+Keywords=file;organizer;download;automation;
+MimeType=inode/directory;
+Actions=StartMinimized;
+
+[Desktop Action StartMinimized]
+Name=Start Minimized
+Exec=python3 /mnt/Projects/GitHub/SELO-FileFlow/src/ui_app.py --minimized
