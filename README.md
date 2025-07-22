@@ -120,7 +120,7 @@ MIT License
 ## Credits
 
 - Original Windows version by SELOdev
-- Linux port and enhancements by [Your Name]
+- Linux port and enhancements by SELOdev
 - Built with Python, PyQt5, watchdog, and PyYAML
 
 ---
