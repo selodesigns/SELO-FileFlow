@@ -15,6 +15,29 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+# Set up Linux environment variables to reduce warnings
+if sys.platform.startswith('linux'):
+    # Set XDG_RUNTIME_DIR if not set
+    if 'XDG_RUNTIME_DIR' not in os.environ:
+        runtime_dir = f'/tmp/runtime-{os.getenv("USER", "user")}'
+        os.environ['XDG_RUNTIME_DIR'] = runtime_dir
+        # Create the directory if it doesn't exist
+        Path(runtime_dir).mkdir(mode=0o700, exist_ok=True)
+    
+    # Suppress some Qt warnings for cleaner output
+    os.environ['QT_LOGGING_RULES'] = 'qt.qpa.xcb.glx.debug=false'
+    
+    # Set Qt platform theme for better integration
+    if 'QT_QPA_PLATFORMTHEME' not in os.environ:
+        # Try to detect desktop environment and set appropriate theme
+        desktop_env = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+        if 'gnome' in desktop_env:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'gtk3'
+        elif 'kde' in desktop_env or 'plasma' in desktop_env:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'kde'
+        else:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'gtk3'  # Default fallback
+
 from src.modules.ui_manager import run_ui
 from src.set_app_id import set_app_id
 from src.modules.user_dirs import user_dirs
