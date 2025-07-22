@@ -9,6 +9,30 @@ import logging
 from pathlib import Path
 from functools import partial
 
+# Set up Linux environment variables for cleaner startup (applies to all launch methods)
+if sys.platform.startswith('linux'):
+    # Set XDG_RUNTIME_DIR if not set
+    if 'XDG_RUNTIME_DIR' not in os.environ:
+        runtime_dir = f'/tmp/runtime-{os.getenv("USER", "user")}'
+        os.environ['XDG_RUNTIME_DIR'] = runtime_dir
+        # Create the directory if it doesn't exist
+        Path(runtime_dir).mkdir(mode=0o700, exist_ok=True)
+    
+    # Suppress Qt warnings and PNG color profile warnings for cleaner output
+    os.environ['QT_LOGGING_RULES'] = 'qt.qpa.xcb.glx.debug=false'
+    # Suppress libpng warnings about color profiles
+    os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning:PIL'
+    
+    # Set appropriate Qt platform theme for better desktop integration
+    if 'QT_QPA_PLATFORMTHEME' not in os.environ:
+        desktop_env = os.getenv('XDG_CURRENT_DESKTOP', '').lower()
+        if 'gnome' in desktop_env:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'gtk3'
+        elif 'kde' in desktop_env or 'plasma' in desktop_env:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'kde'
+        else:
+            os.environ['QT_QPA_PLATFORMTHEME'] = 'gtk3'  # Default fallback
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QListWidget, QFileDialog, QTabWidget, QFormLayout,
