@@ -98,19 +98,22 @@ class FileFlowMainWindow(QMainWindow):
             self.source_list.addItem(QListWidgetItem(src))
         source_layout.addWidget(self.source_list)
         
-        # Source buttons with better descriptions
+        # Source buttons with improved legibility
         source_btn_layout = QHBoxLayout()
-        btn_add_source = QPushButton('➕ Add Source Folder')
+        btn_add_source = QPushButton('Add Source')
         btn_add_source.setToolTip('Add a new folder for FileFlow to monitor and organize files from')
         btn_add_source.clicked.connect(self.add_source_folder)
+        btn_add_source.setMinimumHeight(30)
         
-        btn_browse_source = QPushButton('📂 Browse & Add')
+        btn_browse_source = QPushButton('Browse...')
         btn_browse_source.setToolTip('Browse your computer to select a folder to monitor')
         btn_browse_source.clicked.connect(self.browse_and_add_source)
+        btn_browse_source.setMinimumHeight(30)
         
-        btn_remove_source = QPushButton('❌ Remove Selected')
+        btn_remove_source = QPushButton('Remove')
         btn_remove_source.setToolTip('Remove the selected source folder from monitoring')
         btn_remove_source.clicked.connect(self.remove_selected_source)
+        btn_remove_source.setMinimumHeight(30)
         
         source_btn_layout.addWidget(btn_add_source)
         source_btn_layout.addWidget(btn_browse_source)
@@ -140,19 +143,22 @@ class FileFlowMainWindow(QMainWindow):
             self.dest_list.addItem(QListWidgetItem(f'{cat}: {dst}'))
         dest_layout.addWidget(self.dest_list)
         
-        # Destination buttons with better descriptions
+        # Destination buttons with improved legibility
         dest_btn_layout = QHBoxLayout()
-        btn_add_dest = QPushButton('➕ Add Destination')
+        btn_add_dest = QPushButton('Add Destination')
         btn_add_dest.setToolTip('Add a new category and destination folder for organized files')
         btn_add_dest.clicked.connect(self.add_destination)
+        btn_add_dest.setMinimumHeight(30)
         
-        btn_edit_dest = QPushButton('✏️ Edit Selected')
+        btn_edit_dest = QPushButton('Edit')
         btn_edit_dest.setToolTip('Edit the selected destination folder path or category name')
         btn_edit_dest.clicked.connect(self.edit_selected_destination)
+        btn_edit_dest.setMinimumHeight(30)
         
-        btn_remove_dest = QPushButton('❌ Remove Selected')
+        btn_remove_dest = QPushButton('Remove')
         btn_remove_dest.setToolTip('Remove the selected destination category')
         btn_remove_dest.clicked.connect(self.remove_selected_destination)
+        btn_remove_dest.setMinimumHeight(30)
         
         dest_btn_layout.addWidget(btn_add_dest)
         dest_btn_layout.addWidget(btn_edit_dest)
@@ -174,9 +180,10 @@ class FileFlowMainWindow(QMainWindow):
         config_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px;')
         config_layout.addWidget(config_desc)
         
-        btn_open_config = QPushButton('🔧 Open Configuration File')
+        btn_open_config = QPushButton('Open Config File')
         btn_open_config.setToolTip('Open the YAML configuration file in your default text editor for advanced customization')
         btn_open_config.clicked.connect(self.open_config)
+        btn_open_config.setMinimumHeight(30)
         config_layout.addWidget(btn_open_config)
         config_group.setLayout(config_layout)
         folders_layout.addWidget(config_group)
@@ -221,17 +228,20 @@ class FileFlowMainWindow(QMainWindow):
         
         # Category management buttons
         categories_btn_layout = QHBoxLayout()
-        btn_add_category = QPushButton('➕ Add Category')
+        btn_add_category = QPushButton('Add Category')
         btn_add_category.setToolTip('Create a new file category with custom extensions')
         btn_add_category.clicked.connect(self.add_category)
+        btn_add_category.setMinimumHeight(30)
         
-        btn_edit_extensions = QPushButton('✏️ Edit Extensions')
+        btn_edit_extensions = QPushButton('Edit Extensions')
         btn_edit_extensions.setToolTip('Modify the file extensions for the selected category')
         btn_edit_extensions.clicked.connect(self.edit_category_extensions)
+        btn_edit_extensions.setMinimumHeight(30)
         
-        btn_remove_category = QPushButton('❌ Remove Category')
+        btn_remove_category = QPushButton('Remove')
         btn_remove_category.setToolTip('Delete the selected file category')
         btn_remove_category.clicked.connect(self.remove_selected_category)
+        btn_remove_category.setMinimumHeight(30)
         
         categories_btn_layout.addWidget(btn_add_category)
         categories_btn_layout.addWidget(btn_edit_extensions)
@@ -284,17 +294,20 @@ class FileFlowMainWindow(QMainWindow):
         
         # Custom mapping buttons
         mappings_btn_layout = QHBoxLayout()
-        btn_add_map = QPushButton('➕ Add Mapping')
+        btn_add_map = QPushButton('Add Mapping')
         btn_add_map.setToolTip('Create a new custom mapping for a specific file extension')
         btn_add_map.clicked.connect(self.add_mapping)
+        btn_add_map.setMinimumHeight(30)
         
-        btn_edit_map = QPushButton('✏️ Edit Selected')
+        btn_edit_map = QPushButton('Edit')
         btn_edit_map.setToolTip('Modify the selected custom mapping')
         btn_edit_map.clicked.connect(self.edit_selected_mapping)
+        btn_edit_map.setMinimumHeight(30)
         
-        btn_remove_map = QPushButton('❌ Remove Selected')
+        btn_remove_map = QPushButton('Remove')
         btn_remove_map.setToolTip('Delete the selected custom mapping')
         btn_remove_map.clicked.connect(self.remove_selected_mapping)
+        btn_remove_map.setMinimumHeight(30)
         
         mappings_btn_layout.addWidget(btn_add_map)
         mappings_btn_layout.addWidget(btn_edit_map)
@@ -392,7 +405,7 @@ class FileFlowMainWindow(QMainWindow):
         classification_config = config.get('content_classification', {})
         
         # Main classification toggle
-        self.chk_content_classification = QCheckBox('🧠 Enable Content Classification')
+        self.chk_content_classification = QCheckBox('Enable Content Classification')
         self.chk_content_classification.setToolTip('Master switch for all content classification features')
         self.chk_content_classification.setChecked(classification_config.get('enabled', True))
         settings_layout.addWidget(self.chk_content_classification)
@@ -401,12 +414,12 @@ class FileFlowMainWindow(QMainWindow):
         analysis_methods_group = QGroupBox('Analysis Methods')
         analysis_methods_layout = QVBoxLayout()
         
-        self.chk_filename_analysis = QCheckBox('📝 Filename Pattern Analysis')
+        self.chk_filename_analysis = QCheckBox('Filename Pattern Analysis')
         self.chk_filename_analysis.setToolTip('Analyze filenames for NSFW/SFW keywords and patterns (always recommended)')
         self.chk_filename_analysis.setChecked(classification_config.get('use_filename_analysis', True))
         analysis_methods_layout.addWidget(self.chk_filename_analysis)
         
-        self.chk_visual_analysis = QCheckBox('👁️ Advanced Visual Analysis')
+        self.chk_visual_analysis = QCheckBox('Advanced Visual Analysis')
         self.chk_visual_analysis.setToolTip('Use OpenCV for skin detection, face detection, and color analysis (requires OpenCV)')
         self.chk_visual_analysis.setChecked(classification_config.get('use_visual_analysis', True))
         analysis_methods_layout.addWidget(self.chk_visual_analysis)
@@ -418,7 +431,7 @@ class FileFlowMainWindow(QMainWindow):
         scope_group = QGroupBox('Classification Scope')
         scope_layout = QVBoxLayout()
         
-        self.chk_media_only = QCheckBox('📱 Classify Media Files Only')
+        self.chk_media_only = QCheckBox('Classify Media Files Only')
         self.chk_media_only.setToolTip('Only classify images and videos, skip documents and other file types')
         self.chk_media_only.setChecked(classification_config.get('classify_media_only', True))
         scope_layout.addWidget(self.chk_media_only)
@@ -430,7 +443,7 @@ class FileFlowMainWindow(QMainWindow):
         privacy_group = QGroupBox('Privacy & Notifications')
         privacy_layout = QVBoxLayout()
         
-        self.chk_nsfw_notifications = QCheckBox('🔔 Enable NSFW Move Notifications')
+        self.chk_nsfw_notifications = QCheckBox('Enable NSFW Move Notifications')
         self.chk_nsfw_notifications.setToolTip('Show notifications when NSFW content is detected and moved (disabled by default for privacy)')
         self.chk_nsfw_notifications.setChecked(classification_config.get('notify_nsfw_moves', False))
         privacy_layout.addWidget(self.chk_nsfw_notifications)
@@ -484,24 +497,27 @@ class FileFlowMainWindow(QMainWindow):
         actions_layout.addWidget(actions_desc)
         
         # Test classification button
-        btn_test_classification = QPushButton('🧪 Test Content Classification')
+        btn_test_classification = QPushButton('Test Classification')
         btn_test_classification.setToolTip('Test the classification system on sample files to see how it works')
         btn_test_classification.clicked.connect(self.test_classification)
-        btn_test_classification.setStyleSheet('QPushButton { padding: 6px; }')
+        btn_test_classification.setStyleSheet('QPushButton { padding: 8px; }')
+        btn_test_classification.setMinimumHeight(35)
         actions_layout.addWidget(btn_test_classification)
         
         # Save settings button
-        btn_save_classification_settings = QPushButton('💾 Save Classification Settings')
+        btn_save_classification_settings = QPushButton('Save Settings')
         btn_save_classification_settings.setToolTip('Save your current classification configuration to the config file')
         btn_save_classification_settings.clicked.connect(self.save_classification_settings)
-        btn_save_classification_settings.setStyleSheet('QPushButton { padding: 6px; }')
+        btn_save_classification_settings.setStyleSheet('QPushButton { padding: 8px; }')
+        btn_save_classification_settings.setMinimumHeight(35)
         actions_layout.addWidget(btn_save_classification_settings)
         
         # Reorganize existing files button (prominent)
-        btn_reorganize = QPushButton('🔄 Reorganize Existing Files with Smart Classification')
+        btn_reorganize = QPushButton('Reorganize Files')
         btn_reorganize.setToolTip('Apply content classification to reorganize files already in your destination folders')
         btn_reorganize.clicked.connect(self.reorganize_with_classification)
-        btn_reorganize.setStyleSheet('QPushButton { padding: 10px; font-weight: bold; background-color: #4CAF50; color: white; }')
+        btn_reorganize.setStyleSheet('QPushButton { padding: 12px; font-weight: bold; background-color: #4CAF50; color: white; font-size: 14px; }')
+        btn_reorganize.setMinimumHeight(40)
         actions_layout.addWidget(btn_reorganize)
         
         actions_group.setLayout(actions_layout)
@@ -561,10 +577,11 @@ class FileFlowMainWindow(QMainWindow):
         org_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px;')
         org_layout.addWidget(org_desc)
         
-        btn_organize = QPushButton('🚀 Start File Organization')
+        btn_organize = QPushButton('Start Organization')
         btn_organize.setToolTip('Begin organizing files from source directories using current settings')
         btn_organize.clicked.connect(self.organize_with_feedback)
-        btn_organize.setStyleSheet('QPushButton { padding: 10px; font-weight: bold; background-color: #2196F3; color: white; }')
+        btn_organize.setStyleSheet('QPushButton { padding: 12px; font-weight: bold; background-color: #2196F3; color: white; font-size: 14px; }')
+        btn_organize.setMinimumHeight(40)
         org_layout.addWidget(btn_organize)
         org_group.setLayout(org_layout)
         settings_layout.addWidget(org_group)
@@ -573,12 +590,12 @@ class FileFlowMainWindow(QMainWindow):
         prefs_group = QGroupBox('💻 System Preferences')
         prefs_layout = QVBoxLayout()
         
-        self.chk_autostart = QCheckBox('🚀 Enable autostart at login')
+        self.chk_autostart = QCheckBox('Enable autostart at login')
         self.chk_autostart.setToolTip('Automatically start FileFlow when you log into your system')
         self.chk_autostart.stateChanged.connect(lambda state: self.statusbar.showMessage('Autostart preference updated', 2000))
         prefs_layout.addWidget(self.chk_autostart)
         
-        self.chk_notifications = QCheckBox('🔔 Enable system notifications')
+        self.chk_notifications = QCheckBox('Enable system notifications')
         self.chk_notifications.setToolTip('Show desktop notifications for file organization events')
         self.chk_notifications.stateChanged.connect(lambda state: self.statusbar.showMessage('Notification preference updated', 2000))
         prefs_layout.addWidget(self.chk_notifications)
