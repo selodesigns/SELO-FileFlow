@@ -66,6 +66,22 @@ def check_exiftool():
         print(f"   ❌ ExifTool: not found")
         return False
 
+def check_ffmpeg():
+    """Check FFmpeg specifically."""
+    try:
+        result = subprocess.run(['ffmpeg', '-version'], 
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            version_line = result.stdout.split('\n')[0]
+            print(f"   ✅ FFmpeg: {version_line}")
+            return True
+        else:
+            print(f"   ❌ FFmpeg: command failed")
+            return False
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+        print(f"   ❌ FFmpeg: not found")
+        return False
+
 def test_fileflow_imports():
     """Test FileFlow module imports."""
     print("\n🔧 Testing FileFlow module imports...")
@@ -150,7 +166,7 @@ def main():
     # System dependencies
     print("\n🖥️  Checking system dependencies...")
     all_checks.append(check_exiftool())
-    all_checks.append(check_system_dependency('ffmpeg', 'FFmpeg'))
+    all_checks.append(check_ffmpeg())
     
     # FileFlow module imports
     all_checks.append(test_fileflow_imports())
