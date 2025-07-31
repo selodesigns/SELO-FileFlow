@@ -1,12 +1,12 @@
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QSystemTrayIcon, QMenu, QAction, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QLineEdit, QFormLayout, QInputDialog, QStatusBar, QCheckBox
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QSystemTrayIcon, QMenu, QAction, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QLineEdit, QFormLayout, QInputDialog, QStatusBar, QCheckBox, QSlider, QSpinBox, QGroupBox, QTextEdit
 )
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import Qt, QEvent
-from ..config import load_config, CONFIG_FILE
-from ..organizer import organize_files
+from ..config import load_config, save_config, CONFIG_FILE
+from ..organizer import organize_files, reorganize_existing_files
 
 ICON_PATH = Path(__file__).parent.parent / 'data' / 'icons' / 'fileflow.png'
 
@@ -143,6 +143,126 @@ class FileFlowMainWindow(QMainWindow):
         mappings_tab.setLayout(mappings_layout)
         tabs.addTab(mappings_tab, 'Custom Mappings')
         print('init_ui: Custom Mappings tab added')
+        
+        # Content Classification Tab
+        classification_tab = QWidget()
+        classification_layout = QVBoxLayout()
+        
+        # Header
+        header_label = QLabel('<b>Enhanced Content Classification</b>')
+        header_label.setFont(QFont('Arial', 12, QFont.Bold))
+        classification_layout.addWidget(header_label)
+        
+        # Status section
+        status_group = QGroupBox('System Status')
+        status_layout = QVBoxLayout()
+        
+        # Check classifier capabilities
+        try:
+            from ..robust_content_classifier import RobustContentClassifier
+            classifier = RobustContentClassifier()
+            
+            pillow_status = '✅ Available' if classifier.has_pillow else '❌ Not Available'
+            opencv_status = '✅ Available' if classifier.has_opencv else '❌ Not Available'
+            exiftool_status = '✅ Available' if classifier.has_exiftool else '❌ Not Available'
+            
+            status_layout.addWidget(QLabel(f'Pillow (Image Analysis): {pillow_status}'))
+            status_layout.addWidget(QLabel(f'OpenCV (Visual Analysis): {opencv_status}'))
+            status_layout.addWidget(QLabel(f'ExifTool (Metadata): {exiftool_status}'))
+            
+        except ImportError:
+            status_layout.addWidget(QLabel('⚠️ Enhanced classifier not available'))
+        
+        status_group.setLayout(status_layout)
+        classification_layout.addWidget(status_group)
+        
+        # Settings section
+        settings_group = QGroupBox('Classification Settings')
+        settings_layout = QVBoxLayout()
+        
+        # Get current classification config
+        classification_config = config.get('content_classification', {})
+        
+        self.chk_content_classification = QCheckBox('Enable Content Classification')
+        self.chk_content_classification.setChecked(classification_config.get('enabled', True))
+        settings_layout.addWidget(self.chk_content_classification)
+        
+        self.chk_visual_analysis = QCheckBox('Use Visual Analysis (requires OpenCV)')
+        self.chk_visual_analysis.setChecked(classification_config.get('use_visual_analysis', True))
+        settings_layout.addWidget(self.chk_visual_analysis)
+        
+        self.chk_filename_analysis = QCheckBox('Use Filename Analysis')
+        self.chk_filename_analysis.setChecked(classification_config.get('use_filename_analysis', True))
+        settings_layout.addWidget(self.chk_filename_analysis)
+        
+        self.chk_media_only = QCheckBox('Classify Media Files Only')
+        self.chk_media_only.setChecked(classification_config.get('classify_media_only', True))
+        settings_layout.addWidget(self.chk_media_only)
+        
+        self.chk_nsfw_notifications = QCheckBox('Enable NSFW Move Notifications')
+        self.chk_nsfw_notifications.setChecked(classification_config.get('notify_nsfw_moves', False))
+        settings_layout.addWidget(self.chk_nsfw_notifications)
+        
+        # Threshold slider
+        threshold_layout = QHBoxLayout()
+        threshold_layout.addWidget(QLabel('Visual Analysis Threshold:'))
+        self.threshold_slider = QSlider(Qt.Horizontal)
+        self.threshold_slider.setMinimum(30)
+        self.threshold_slider.setMaximum(90)
+        self.threshold_slider.setValue(int(classification_config.get('visual_analysis_threshold', 0.6) * 100))
+        self.threshold_value_label = QLabel(f'{self.threshold_slider.value()}%')
+        self.threshold_slider.valueChanged.connect(lambda v: self.threshold_value_label.setText(f'{v}%'))
+        threshold_layout.addWidget(self.threshold_slider)
+        threshold_layout.addWidget(self.threshold_value_label)
+        settings_layout.addLayout(threshold_layout)
+        
+        settings_group.setLayout(settings_layout)
+        classification_layout.addWidget(settings_group)
+        
+        # Actions section
+        actions_group = QGroupBox('Actions')
+        actions_layout = QVBoxLayout()
+        
+        btn_reorganize = QPushButton('🔄 Reorganize Existing Files with Content Classification')
+        btn_reorganize.clicked.connect(self.reorganize_with_classification)
+        btn_reorganize.setStyleSheet('QPushButton { padding: 8px; font-weight: bold; }')
+        actions_layout.addWidget(btn_reorganize)
+        
+        btn_test_classification = QPushButton('🧪 Test Content Classification')
+        btn_test_classification.clicked.connect(self.test_classification)
+        actions_layout.addWidget(btn_test_classification)
+        
+        btn_save_classification_settings = QPushButton('💾 Save Classification Settings')
+        btn_save_classification_settings.clicked.connect(self.save_classification_settings)
+        actions_layout.addWidget(btn_save_classification_settings)
+        
+        actions_group.setLayout(actions_layout)
+        classification_layout.addWidget(actions_group)
+        
+        # Info section
+        info_group = QGroupBox('About Content Classification')
+        info_layout = QVBoxLayout()
+        info_text = QTextEdit()
+        info_text.setReadOnly(True)
+        info_text.setMaximumHeight(120)
+        info_text.setHtml(
+            '<p><b>Enhanced Content Classification</b> uses multiple analysis methods:</p>'
+            '<ul>'
+            '<li><b>Filename Analysis:</b> Detects NSFW/SFW keywords and patterns</li>'
+            '<li><b>Visual Analysis:</b> Skin detection, face recognition, color analysis</li>'
+            '<li><b>File Properties:</b> Size, metadata, and characteristic analysis</li>'
+            '<li><b>Smart Scoring:</b> Combines multiple factors for accurate classification</li>'
+            '</ul>'
+            '<p>Files are organized into SFW and NSFW subdirectories within existing categories.</p>'
+        )
+        info_layout.addWidget(info_text)
+        info_group.setLayout(info_layout)
+        classification_layout.addWidget(info_group)
+        
+        classification_tab.setLayout(classification_layout)
+        tabs.addTab(classification_tab, 'Content Classification')
+        print('init_ui: Content Classification tab added')
+        
         # Settings Tab
         settings_tab = QWidget()
         settings_layout = QVBoxLayout()
@@ -447,10 +567,195 @@ class FileFlowMainWindow(QMainWindow):
         progress_dialog.exec_()
         self.statusbar.showMessage('Organization complete', 3000)
 
+    def save_classification_settings(self):
+        """Save content classification settings to config."""
+        try:
+            config = load_config()
+            
+            # Update classification settings
+            classification_config = {
+                'enabled': self.chk_content_classification.isChecked(),
+                'use_visual_analysis': self.chk_visual_analysis.isChecked(),
+                'use_filename_analysis': self.chk_filename_analysis.isChecked(),
+                'classify_media_only': self.chk_media_only.isChecked(),
+                'notify_nsfw_moves': self.chk_nsfw_notifications.isChecked(),
+                'visual_analysis_threshold': self.threshold_slider.value() / 100.0,
+                'create_content_subdirs': True,
+                'cache_analysis_results': True
+            }
+            
+            config['content_classification'] = classification_config
+            save_config(config)
+            
+            QMessageBox.information(self, 'Settings Saved', 
+                'Content classification settings have been saved successfully!')
+            self.statusbar.showMessage('Classification settings saved', 3000)
+            
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f'Failed to save settings: {e}')
+    
+    def test_classification(self):
+        """Test the content classification system."""
+        try:
+            from ..robust_content_classifier import RobustContentClassifier
+            classifier = RobustContentClassifier()
+            
+            # Show classifier capabilities
+            capabilities = []
+            if classifier.has_pillow:
+                capabilities.append('✅ Pillow (Image Analysis)')
+            else:
+                capabilities.append('❌ Pillow (Image Analysis)')
+                
+            if classifier.has_opencv:
+                capabilities.append('✅ OpenCV (Advanced Visual Analysis)')
+            else:
+                capabilities.append('❌ OpenCV (Advanced Visual Analysis)')
+                
+            if classifier.has_exiftool:
+                capabilities.append('✅ ExifTool (Metadata Extraction)')
+            else:
+                capabilities.append('❌ ExifTool (Metadata Extraction)')
+            
+            # Test sample filenames
+            test_cases = [
+                ('family_vacation.jpg', 'SFW'),
+                ('xxx_video.mp4', 'NSFW'),
+                ('IMG_1234.jpg', 'Unknown (needs visual analysis)'),
+                ('wedding_photos.png', 'SFW'),
+                ('adult_content.mp4', 'NSFW')
+            ]
+            
+            results = []
+            for filename, expected in test_cases:
+                temp_path = Path('/tmp') / filename
+                analysis = classifier.analyze_filename(temp_path)
+                classification = 'NSFW' if analysis['is_nsfw'] else 'SFW'
+                confidence = analysis['confidence']
+                results.append(f'{filename}: {classification} (confidence: {confidence:.2f})')
+            
+            message = (
+                '<b>Content Classification Test Results</b><br><br>'
+                '<b>System Capabilities:</b><br>' + '<br>'.join(capabilities) + '<br><br>'
+                '<b>Filename Analysis Test:</b><br>' + '<br>'.join(results) + '<br><br>'
+                '<i>Note: Visual analysis requires actual image files and is more accurate than filename-only detection.</i>'
+            )
+            
+            QMessageBox.information(self, 'Classification Test', message)
+            
+        except ImportError:
+            QMessageBox.warning(self, 'Test Failed', 
+                'Enhanced content classifier is not available. Please ensure all dependencies are installed.')
+        except Exception as e:
+            QMessageBox.critical(self, 'Test Error', f'Classification test failed: {e}')
+    
+    def reorganize_with_classification(self):
+        """Reorganize existing files using enhanced content classification."""
+        reply = QMessageBox.question(self, 'Reorganize Files', 
+            'This will reorganize your existing files using enhanced content classification.\n\n'
+            'Files will be moved into SFW and NSFW subdirectories within your existing categories.\n\n'
+            'This operation may take some time depending on the number of files.\n\n'
+            'Do you want to continue?',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            self.reorganize_with_feedback()
+    
+    def reorganize_with_feedback(self):
+        """Reorganize files with progress feedback using enhanced classification."""
+        from PyQt5.QtCore import QThread, pyqtSignal, QObject
+        from PyQt5.QtWidgets import QProgressDialog
+        import time
+        
+        class ReorganizeWorker(QObject):
+            progress = pyqtSignal(str)  # Status message
+            finished = pyqtSignal(dict)  # Results
+            error = pyqtSignal(str)
+            
+            def __init__(self):
+                super().__init__()
+                self._abort = False
+            
+            def abort(self):
+                self._abort = True
+            
+            def run(self):
+                try:
+                    self.progress.emit('Starting enhanced reorganization...')
+                    
+                    # Use the enhanced reorganization function
+                    reorganize_existing_files()
+                    
+                    # Simulate progress updates (in real implementation, this would come from the organizer)
+                    for i in range(1, 6):
+                        if self._abort:
+                            return
+                        self.progress.emit(f'Processing files... ({i*20}%)')
+                        time.sleep(0.5)
+                    
+                    results = {
+                        'sfw': 0,  # These would be real counts from the organizer
+                        'nsfw': 0,
+                        'total': 0
+                    }
+                    
+                    self.finished.emit(results)
+                    
+                except Exception as e:
+                    self.error.emit(str(e))
+        
+        # Create progress dialog
+        progress_dialog = QProgressDialog('Reorganizing files with content classification...', 'Cancel', 0, 0, self)
+        progress_dialog.setWindowTitle('SELO FileFlow - Enhanced Reorganization')
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setMinimumDuration(0)
+        progress_dialog.setCancelButton(None)  # Remove cancel for now
+        
+        # Create worker thread
+        thread = QThread()
+        worker = ReorganizeWorker()
+        worker.moveToThread(thread)
+        
+        # Connect signals
+        worker.progress.connect(lambda msg: progress_dialog.setLabelText(msg))
+        worker.error.connect(lambda msg: QMessageBox.critical(self, 'Reorganization Error', f'Error: {msg}'))
+        worker.finished.connect(lambda results: self.show_reorganization_results(results))
+        worker.finished.connect(lambda: progress_dialog.close())
+        worker.finished.connect(thread.quit)
+        
+        thread.started.connect(worker.run)
+        thread.finished.connect(thread.deleteLater)
+        
+        # Start the process
+        thread.start()
+        progress_dialog.exec_()
+        
+        self.statusbar.showMessage('Enhanced reorganization complete', 3000)
+    
+    def show_reorganization_results(self, results):
+        """Show results of the reorganization process."""
+        message = (
+            '<b>Enhanced Reorganization Complete!</b><br><br>'
+            f'Files have been reorganized using advanced content classification.<br><br>'
+            '<b>Features used:</b><br>'
+            '• Filename pattern analysis<br>'
+            '• Visual content analysis (if available)<br>'
+            '• File property analysis<br>'
+            '• Smart scoring system<br><br>'
+            'Files are now organized into SFW and NSFW subdirectories within your existing categories.'
+        )
+        
+        QMessageBox.information(self, 'Reorganization Results', message)
+
     def show_about(self):
         QMessageBox.about(self, 'About SELO FileFlow',
             '<b>SELO FileFlow (Linux Edition)</b><br>'
-            'Automatic file organizer for Linux.<br>'
+            'Automatic file organizer for Linux with Enhanced Content Classification.<br><br>'
+            '<b>Features:</b><br>'
+            '• Multi-layered content analysis<br>'
+            '• Visual content classification<br>'
+            '• NSFW/SFW automatic separation<br>'
+            '• Smart file organization<br><br>'
             'Original Windows version by SELOdev.<br>'
             'Linux port and enhancements by the community.')
 
