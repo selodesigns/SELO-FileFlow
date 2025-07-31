@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QSystemTrayIcon, QMenu, QAction, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QLineEdit, QFormLayout, QInputDialog, QStatusBar, QCheckBox, QSlider, QSpinBox, QGroupBox, QTextEdit
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QSystemTrayIcon, QMenu, QAction, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QLineEdit, QFormLayout, QInputDialog, QStatusBar, QCheckBox, QSlider, QSpinBox, QGroupBox, QTextEdit, QSizePolicy
 )
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import Qt, QEvent
@@ -64,6 +64,7 @@ class FileFlowMainWindow(QMainWindow):
             config = {}
         print('init_ui: config loaded')
         tabs = QTabWidget()
+        tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         print('init_ui: QTabWidget created')
         # Folders Tab - Enhanced with descriptions
         folders_tab = QWidget()
@@ -94,9 +95,10 @@ class FileFlowMainWindow(QMainWindow):
         
         self.source_list = QListWidget()
         self.source_list.setToolTip('List of folders FileFlow monitors for new files to organize')
+        self.source_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         for src in config.get('source_directories', []):
             self.source_list.addItem(QListWidgetItem(src))
-        source_layout.addWidget(self.source_list)
+        source_layout.addWidget(self.source_list, 1)  # Add stretch factor
         
         # Source buttons with improved legibility
         source_btn_layout = QHBoxLayout()
@@ -120,7 +122,7 @@ class FileFlowMainWindow(QMainWindow):
         source_btn_layout.addWidget(btn_remove_source)
         source_layout.addLayout(source_btn_layout)
         source_group.setLayout(source_layout)
-        folders_layout.addWidget(source_group)
+        folders_layout.addWidget(source_group, 1)  # Add stretch factor
         
         # Destination Directories Section
         dest_group = QGroupBox('📤 Destination Directories')
@@ -139,9 +141,10 @@ class FileFlowMainWindow(QMainWindow):
         
         self.dest_list = QListWidget()
         self.dest_list.setToolTip('List of organized destination folders for each file category')
+        self.dest_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         for cat, dst in config.get('destination_directories', {}).items():
             self.dest_list.addItem(QListWidgetItem(f'{cat}: {dst}'))
-        dest_layout.addWidget(self.dest_list)
+        dest_layout.addWidget(self.dest_list, 1)  # Add stretch factor
         
         # Destination buttons with improved legibility
         dest_btn_layout = QHBoxLayout()
@@ -165,7 +168,7 @@ class FileFlowMainWindow(QMainWindow):
         dest_btn_layout.addWidget(btn_remove_dest)
         dest_layout.addLayout(dest_btn_layout)
         dest_group.setLayout(dest_layout)
-        folders_layout.addWidget(dest_group)
+        folders_layout.addWidget(dest_group, 1)  # Add stretch factor
         
         # Advanced Configuration Section
         config_group = QGroupBox('⚙️ Advanced Configuration')
@@ -222,9 +225,10 @@ class FileFlowMainWindow(QMainWindow):
         
         self.file_types_list = QListWidget()
         self.file_types_list.setToolTip('List of file categories and their associated file extensions')
+        self.file_types_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         for cat, exts in config.get('file_types', {}).items():
             self.file_types_list.addItem(QListWidgetItem(f'{cat}: {", ".join(exts)}'))
-        categories_layout.addWidget(self.file_types_list)
+        categories_layout.addWidget(self.file_types_list, 1)  # Add stretch factor
         
         # Category management buttons
         categories_btn_layout = QHBoxLayout()
@@ -248,7 +252,7 @@ class FileFlowMainWindow(QMainWindow):
         categories_btn_layout.addWidget(btn_remove_category)
         categories_layout.addLayout(categories_btn_layout)
         categories_group.setLayout(categories_layout)
-        file_types_layout.addWidget(categories_group)
+        file_types_layout.addWidget(categories_group, 1)  # Add stretch factor
         file_types_tab.setLayout(file_types_layout)
         tabs.addTab(file_types_tab, 'File Types')
         print('init_ui: File Types tab added')
@@ -283,6 +287,7 @@ class FileFlowMainWindow(QMainWindow):
         
         self.mappings_list = QListWidget()
         self.mappings_list.setToolTip('List of custom file extension to folder mappings')
+        self.mappings_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.custom_mappings = []
         config_mappings = config.get('custom_mappings', [])
         for mapping in config_mappings:
@@ -290,7 +295,7 @@ class FileFlowMainWindow(QMainWindow):
             folder = mapping.get('folder', '')
             self.mappings_list.addItem(QListWidgetItem(f'.{ext} → {folder}'))
             self.custom_mappings.append((ext, folder))
-        mappings_group_layout.addWidget(self.mappings_list)
+        mappings_group_layout.addWidget(self.mappings_list, 1)  # Add stretch factor
         
         # Custom mapping buttons
         mappings_btn_layout = QHBoxLayout()
@@ -314,7 +319,7 @@ class FileFlowMainWindow(QMainWindow):
         mappings_btn_layout.addWidget(btn_remove_map)
         mappings_group_layout.addLayout(mappings_btn_layout)
         mappings_group.setLayout(mappings_group_layout)
-        mappings_layout.addWidget(mappings_group)
+        mappings_layout.addWidget(mappings_group, 1)  # Add stretch factor
         
         mappings_tab.setLayout(mappings_layout)
         tabs.addTab(mappings_tab, '🎯 Custom Mappings')
@@ -480,7 +485,7 @@ class FileFlowMainWindow(QMainWindow):
         settings_layout.addWidget(threshold_group)
         
         settings_group.setLayout(settings_layout)
-        classification_layout.addWidget(settings_group)
+        classification_layout.addWidget(settings_group, 1)  # Add stretch factor
         
         # Actions section with enhanced descriptions
         actions_group = QGroupBox('🎯 Quick Actions')
@@ -531,6 +536,7 @@ class FileFlowMainWindow(QMainWindow):
         info_text = QTextEdit()
         info_text.setReadOnly(True)
         info_text.setMaximumHeight(140)
+        info_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         info_text.setHtml(
             '<p><b>🎆 Multi-Layered Intelligence:</b> FileFlow uses sophisticated analysis combining:</p>'
             '<ul>'
