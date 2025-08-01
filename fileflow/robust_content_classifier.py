@@ -286,18 +286,19 @@ class RobustContentClassifier:
             brightness = np.mean(gray)
             contrast = np.std(gray)
             
-            # Calculate visual suspicion score
+            # Calculate visual suspicion score with stricter thresholds
             visual_score = 0.0
-            if skin_percentage > 30:
-                visual_score += 0.4
+            if skin_percentage > 60:
+                visual_score += 0.6  # Strong NSFW indicator
+            elif skin_percentage > 40:
+                visual_score += 0.3  # Moderate suspicion
             elif skin_percentage > 20:
-                visual_score += 0.2
-            elif skin_percentage > 10:
-                visual_score += 0.1
+                visual_score += 0.1  # Low suspicion
+            # skin_percentage <= 20% adds no visual suspicion
             
-            # Very dark or very bright images might be suspicious
+            # Very dark or very bright images might be suspicious (but much less weight)
             if brightness < 50 or brightness > 200:
-                visual_score += 0.1
+                visual_score += 0.05  # Reduced from 0.1 to prevent false positives
             
             return {
                 'skin_percentage': skin_percentage,

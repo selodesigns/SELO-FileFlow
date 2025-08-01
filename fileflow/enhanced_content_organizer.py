@@ -391,7 +391,12 @@ def organize_files(sources=None, dest=None):
 
 
 
-def reorganize_existing_files(target_dirs: List[str] = None):
-    """Reorganize existing files with enhanced content classification."""
+def reorganize_existing_files(target_dirs: List[str] = None, dest: str = None):
+    """Reorganize existing files with enhanced content classification. CLI can override destination."""
     organizer = EnhancedContentOrganizer()
+    if dest is not None:
+        config = organizer.get_enhanced_config() if organizer.config else {}
+        config['dest'] = dest
+        organizer.config = config
     organizer.reorganize_existing_files(target_dirs)
+
