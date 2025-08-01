@@ -114,7 +114,10 @@ class FileFlowMainWindow(QMainWindow):
         # Source Directories Section
         source_group = QGroupBox('📥 Source Directories')
         source_group.setToolTip('Folders that FileFlow will monitor and organize files from')
+        source_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        source_group.setMinimumHeight(200)  # Ensure minimum height for visibility
         source_layout = QVBoxLayout()
+        source_layout.setSpacing(8)
         
         source_desc = QLabel(
             '<b>What are Source Directories?</b><br>'
@@ -184,7 +187,10 @@ class FileFlowMainWindow(QMainWindow):
         # Destination Directories Section
         dest_group = QGroupBox('📤 Destination Directories')
         dest_group.setToolTip('Organized folders where FileFlow will move sorted files')
+        dest_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        dest_group.setMinimumHeight(200)  # Ensure minimum height for visibility
         dest_layout = QVBoxLayout()
+        dest_layout.setSpacing(8)
         
         dest_desc = QLabel(
             '<b>What are Destination Directories?</b><br>'
@@ -244,7 +250,10 @@ class FileFlowMainWindow(QMainWindow):
         
         # Advanced Configuration Section
         config_group = QGroupBox('⚙️ Advanced Configuration')
+        config_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        config_group.setMinimumHeight(100)  # Smaller minimum height for config section
         config_layout = QVBoxLayout()
+        config_layout.setSpacing(8)
         
         config_desc = QLabel(
             '<b>Need Advanced Settings?</b><br>'
@@ -262,6 +271,9 @@ class FileFlowMainWindow(QMainWindow):
         config_layout.addWidget(btn_open_config)
         config_group.setLayout(config_layout)
         folders_layout.addWidget(config_group)
+        
+        # Add stretch at the end to push content to top
+        folders_layout.addStretch()
         
         folders_tab.setLayout(folders_layout)
         tabs.addTab(folders_tab, '📁 Folders')
