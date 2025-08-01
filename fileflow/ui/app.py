@@ -423,11 +423,17 @@ class FileFlowMainWindow(QMainWindow):
         print('init_ui: Custom Mappings tab added')
         
         # Content Classification Tab - Enhanced with descriptions
+        from PyQt5.QtWidgets import QScrollArea
         classification_tab = QWidget()
-        classification_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        classification_layout = QVBoxLayout()
+        classification_layout = QVBoxLayout(classification_tab)
         classification_layout.setSpacing(10)
         classification_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Build all content into a container widget for the scroll area
+        classification_content = QWidget()
+        classification_content_layout = QVBoxLayout(classification_content)
+        classification_content_layout.setSpacing(10)
+        classification_content_layout.setContentsMargins(0, 0, 0, 0)
         
         # Add main description for Content Classification
         classification_main_desc = QLabel(
@@ -436,11 +442,12 @@ class FileFlowMainWindow(QMainWindow):
             'This ensures your media files are organized appropriately with high accuracy.</p>'
         )
         classification_main_desc.setWordWrap(True)
-        classification_layout.addWidget(classification_main_desc)
+        classification_content_layout.addWidget(classification_main_desc)
         
         # System Status section with enhanced descriptions
         status_group = QGroupBox('🔍 Analysis Capabilities Status')
         status_group.setToolTip('Shows which advanced analysis features are available on your system')
+        status_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         status_layout = QVBoxLayout()
         
         status_desc = QLabel(
@@ -585,11 +592,12 @@ class FileFlowMainWindow(QMainWindow):
         settings_layout.addWidget(threshold_group)
         
         settings_group.setLayout(settings_layout)
-        classification_layout.addWidget(settings_group, 1)  # Add stretch factor
+        classification_content_layout.addWidget(settings_group)
         
         # Actions section with enhanced descriptions
-        actions_group = QGroupBox('🎯 Quick Actions')
-        actions_group.setToolTip('Test and apply content classification to your files')
+        actions_group = QGroupBox('⚡ Actions')
+        actions_group.setToolTip('Test and apply classification settings')
+        actions_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         actions_layout = QVBoxLayout()
         
         actions_desc = QLabel(
@@ -606,7 +614,6 @@ class FileFlowMainWindow(QMainWindow):
         btn_test_classification.setToolTip('Test the classification system on sample files to see how it works')
         btn_test_classification.clicked.connect(self.test_classification)
         btn_test_classification.setStyleSheet('QPushButton { padding: 8px; }')
-        btn_test_classification.setMinimumHeight(35)
         actions_layout.addWidget(btn_test_classification)
         
         # Save settings button
@@ -614,7 +621,6 @@ class FileFlowMainWindow(QMainWindow):
         btn_save_classification_settings.setToolTip('Save your current classification configuration to the config file')
         btn_save_classification_settings.clicked.connect(self.save_classification_settings)
         btn_save_classification_settings.setStyleSheet('QPushButton { padding: 8px; }')
-        btn_save_classification_settings.setMinimumHeight(35)
         actions_layout.addWidget(btn_save_classification_settings)
         
         # Reorganize existing files button (prominent)
@@ -622,15 +628,15 @@ class FileFlowMainWindow(QMainWindow):
         btn_reorganize.setToolTip('Apply content classification to reorganize files already in your destination folders')
         btn_reorganize.clicked.connect(self.reorganize_with_classification)
         btn_reorganize.setStyleSheet('QPushButton { padding: 12px; font-weight: bold; background-color: #4CAF50; color: white; font-size: 14px; }')
-        btn_reorganize.setMinimumHeight(40)
         actions_layout.addWidget(btn_reorganize)
         
         actions_group.setLayout(actions_layout)
-        classification_layout.addWidget(actions_group)
+        classification_content_layout.addWidget(actions_group)
         
         # Info section with enhanced descriptions
         info_group = QGroupBox('📚 How Content Classification Works')
         info_group.setToolTip('Learn about FileFlow\'s advanced content analysis system')
+        info_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         info_layout = QVBoxLayout()
         
         info_text = QTextEdit()
@@ -651,8 +657,14 @@ class FileFlowMainWindow(QMainWindow):
         )
         info_layout.addWidget(info_text)
         info_group.setLayout(info_layout)
-        classification_layout.addWidget(info_group)
-        
+        classification_content_layout.addWidget(info_group)
+        classification_content_layout.addStretch()
+
+        # --- Add content widget to scroll area ---
+        classification_scroll = QScrollArea()
+        classification_scroll.setWidgetResizable(True)
+        classification_scroll.setWidget(classification_content)
+        classification_layout.addWidget(classification_scroll)
         classification_tab.setLayout(classification_layout)
         tabs.addTab(classification_tab, '🧠 Content Classification')
         print('init_ui: Content Classification tab added')
