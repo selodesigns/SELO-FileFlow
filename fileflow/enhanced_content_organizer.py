@@ -202,6 +202,7 @@ class EnhancedContentOrganizer:
     
     def organize_files(self):
         """Organize files with enhanced content-based separation."""
+        import sys
         config = self.get_enhanced_config()
         src_dirs = config['source_directories']
         notify = config.get('notify_on_move', True)
@@ -210,14 +211,19 @@ class EnhancedContentOrganizer:
         moved_files = {'sfw': 0, 'nsfw': 0, 'other': 0}
         analysis_stats = {'filename_only': 0, 'visual_only': 0, 'filename+visual': 0, 'visual_override': 0}
         
+        is_cli = hasattr(sys, 'ps1') is False and sys.stdout.isatty()
+        if is_cli:
+            print("[FileFlow] Starting organization job...")
         for src_dir in src_dirs:
             src_path = Path(src_dir).expanduser()
             if not src_path.exists():
                 logger.error(f"Source directory does not exist: {src_path}")
+                if is_cli:
+                    print(f"[FileFlow] Source directory does not exist: {src_path}")
                 continue
-            
             logger.info(f"Organizing files in: {src_path}")
-            
+            if is_cli:
+                print(f"[FileFlow] Organizing files in: {src_path}")
             for item in src_path.iterdir():
                 if item.is_file():
                     try:
