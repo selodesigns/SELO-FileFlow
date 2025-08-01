@@ -226,6 +226,18 @@ class EnhancedContentOrganizer:
                 print(f"[FileFlow] Organizing files in: {src_path}")
             for item in src_path.rglob('*'):
                 if item.is_file():
+                    # System/protected file exclusion
+                    if (
+                        item.name.startswith('.') or
+                        item.is_symlink() or
+                        not item.resolve().is_file() or
+                        item.is_socket() if hasattr(item, 'is_socket') else False or
+                        item.is_fifo() if hasattr(item, 'is_fifo') else False or
+                        not str(item.resolve()).startswith(str(src_path.resolve()))
+                    ):
+                        if is_cli:
+                            print(f"[FileFlow] Skipped protected/system file: {item}")
+                        continue
                     try:
                         dest_dir, classification = self.get_destination_path(item, config)
                         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -251,7 +263,10 @@ class EnhancedContentOrganizer:
                             analysis_stats[method] += 1
                         # CLI feedback
                         if is_cli:
-                            print(f"[FileFlow] Moved {item} to {dest_file}")
+                            method = classification.get('method', 'unknown')
+                            confidence = classification.get('confidence', 0)
+                            cat = 'NSFW' if classification.get('is_nsfw') else 'SFW'
+                            print(f"[FileFlow] Moved {item} to {dest_file} [{cat}, {method}, confidence: {confidence:.2f}]")
                         # Send notification (respecting privacy settings)
                         if notify and (not classification['is_nsfw'] or notify_nsfw):
                             content_label = 'NSFW' if classification['is_nsfw'] else 'SFW'
@@ -272,18 +287,25 @@ class EnhancedContentOrganizer:
             logger.info(f"Organization complete! Moved {total_moved} files:")
             logger.info(f"  - SFW: {moved_files['sfw']}")
             logger.info(f"  - NSFW: {moved_files['nsfw']}")
-            logger.info(f"  - Other/Failed: {moved_files['other']}")
-            logger.info(f"Analysis methods used:")
-            for method, count in analysis_stats.items():
-                if count > 0:
-                    logger.info(f"  - {method}: {count}")
-            
-            # Send summary notification
-            if notify:
-                send_notification(
-                    "FileFlow: Enhanced Organization Complete",
-                    f"Organized {total_moved} files with visual content analysis (SFW: {moved_files['sfw']}, NSFW: {moved_files['nsfw']})"
-                )
+            logger.info(f"  - Other: {moved_files['other']}")
+            if is_cli:
+                print(f"[FileFlow] Organization complete! Moved {total_moved} files:")
+                print(f"[FileFlow]   - SFW: {moved_files['sfw']}")
+                print(f"[FileFlow]   - NSFW: {moved_files['nsfw']}")
+                print(f"[FileFlow]   - Other: {moved_files['other']}")
+                print("[FileFlow] Classification method summary:")
+                print("[FileFlow]   - filename_only:    {}".format(analysis_stats['filename_only']))
+                print("[FileFlow]   - visual_only:      {}".format(analysis_stats['visual_only']))
+                print("[FileFlow]   - filename+visual:  {}".format(analysis_stats['filename+visual']))
+                print("[FileFlow]   - visual_override:  {}".format(analysis_stats['visual_override']))
+                print("[FileFlow]   - other:            {}".format(analysis_stats.get('other', 0)))
+            # Completely disable notifications in CLI mode
+            # Only send notifications if running in GUI/desktop (not CLI/SSH)
+            # (No-op in CLI)
+            pass
+        else:
+            if is_cli:
+                print("[FileFlow] No files needed organization.")
     
     def reorganize_existing_files(self, target_dirs: List[str] = None):
         """Reorganize existing files using enhanced content classification."""
