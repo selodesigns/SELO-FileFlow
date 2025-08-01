@@ -18,44 +18,15 @@ class EnhancedContentOrganizer:
         self.config = load_config()
     
     def get_enhanced_config(self) -> Dict:
-        """Get or create enhanced configuration with content separation."""
+        """Get or create enhanced configuration with content separation, but never seed any destination directories by default."""
         config = self.config.copy()
-        
-        # Add content-based destination directories if not present
-        if 'content_destinations' not in config:
-            home = Path.home()
-            config['content_destinations'] = {
-                'sfw': {
-                    'images': str(home / 'Pictures' / 'SFW'),
-                    'videos': str(home / 'Videos' / 'SFW'),
-                    'documents': str(home / 'Documents' / 'SFW'),
-                    'other': str(home / 'Downloads' / 'Other' / 'SFW')
-                },
-                'nsfw': {
-                    'images': str(home / 'Pictures' / 'NSFW'),
-                    'videos': str(home / 'Videos' / 'NSFW'),
-                    'documents': str(home / 'Documents' / 'NSFW'),
-                    'other': str(home / 'Downloads' / 'Other' / 'NSFW')
-                }
-            }
-            
-            # Add enhanced content classification settings
-            config['content_classification'] = {
-                'enabled': True,
-                'use_visual_analysis': True,
-                'use_filename_analysis': True,
-                'visual_analysis_threshold': 0.6,
-                'filename_overrides_visual': False,  # Visual analysis takes precedence
-                'classify_media_only': True,
-                'create_content_subdirs': True,
-                'notify_nsfw_moves': False,  # Privacy consideration
-                'cache_analysis_results': True
-            }
-            
-            # Save the enhanced config
-            save_config(config)
-            self.config = config
-        
+        # Remove any logic that seeds home/XDG-based destinations
+        if 'content_destinations' in config:
+            # If present, leave as-is (user must have set it explicitly)
+            return config
+        # No content_destinations: abort unless user provided explicit destinations
+        if not (config.get('user_destination') or config.get('dest')):
+            raise RuntimeError("No destination directory specified. Please provide --dest on the CLI or set it in the config. FileFlow will not use any default or home/XDG-based destination.")
         return config
     
     def get_category_for_file(self, filename: str, file_types: Dict) -> str:
@@ -161,44 +132,38 @@ class EnhancedContentOrganizer:
         return result
     
     def get_destination_path(self, file_path: Path, config: Dict) -> Tuple[Path, Dict]:
-        """Get the destination path for a file based on content and category."""
+        """Get the destination path for a file based only on the user-supplied destination. Abort if unavailable or unwritable."""
+        import os
         filename = file_path.name
-        
-        # Get basic file category
         category = self.get_category_for_file(filename, config['file_types'])
         
-        # Check if content classification is enabled
-        if not config.get('content_classification', {}).get('enabled', True):
-            # Use original logic
-            dest_dir = config['destination_directories'].get(category, config['destination_directories']['other'])
-            return Path(dest_dir).expanduser(), {'is_nsfw': False, 'method': 'disabled'}
-        
-        # Determine if file should be content-classified
+        # Always use the user-supplied destination root
+        user_dest = config.get('user_destination') or config.get('dest') or None
+        if not user_dest:
+            raise RuntimeError("No destination directory specified. Please provide --dest on the CLI or set it in the config.")
+        dest_root = Path(user_dest).expanduser()
+        if not dest_root.exists():
+            raise RuntimeError(f"Destination directory does not exist: {dest_root}")
+        if not os.access(dest_root, os.W_OK):
+            raise RuntimeError(f"Destination directory is not writable: {dest_root}")
+
+        # Determine subfolder by content type
         should_classify = (
             config.get('content_classification', {}).get('classify_media_only', True) and
             (self.filename_classifier.should_classify_file(file_path) or 
              self.visual_classifier.should_classify_file(file_path))
         ) or not config.get('content_classification', {}).get('classify_media_only', True)
-        
+
         if should_classify:
-            # Classify content using enhanced analysis
             classification_result = self.classify_file_content(file_path, config)
-            content_type = 'nsfw' if classification_result['is_nsfw'] else 'sfw'
-            
-            # Get content-specific destination
-            content_destinations = config.get('content_destinations', {})
-            if content_type in content_destinations and category in content_destinations[content_type]:
-                dest_dir = content_destinations[content_type][category]
-            else:
-                # Fallback to regular destinations with content subdirectory
-                base_dest = config['destination_directories'].get(category, config['destination_directories']['other'])
-                dest_dir = str(Path(base_dest) / content_type.upper())
+            content_type = 'NSFW' if classification_result['is_nsfw'] else 'SFW'
+            dest_dir = dest_root / content_type
         else:
-            # Use original destination for non-media files
-            dest_dir = config['destination_directories'].get(category, config['destination_directories']['other'])
             classification_result = {'is_nsfw': False, 'method': 'not_classified'}
-        
-        return Path(dest_dir).expanduser(), classification_result
+            dest_dir = dest_root / 'Other'
+
+        return dest_dir, classification_result
+
     
     def organize_files(self):
         """Organize files with enhanced content-based separation."""
