@@ -537,10 +537,21 @@ class RobustContentClassifier:
         filename = file_path.name.lower()
         explicit_terms = ['porn', 'xxx', 'nsfw', 'adult', 'sex', 'fuck', 'dick', 'pussy', 'nude', 'naked',
                          'bdsm', 'fetish', 'hentai', 'blowjob', 'handjob', 'cum', 'creampie', 'anal',
-                         'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34']
+                         'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34',
+                         'cock', 'ass', 'boob', 'tits', 'titties', 'pornstar', 'xxxvideo', 'xxxpic',
+                         'hardcore', 'facial', 'orgy', 'threesome', 'gangbang', 'bukkake', 'bdsm', 'bondage']
         
         # Check if filename contains any explicit terms
         is_explicit_filename = any(term in filename for term in explicit_terms)
+        
+        # If filename is explicit, mark as NSFW immediately with high confidence
+        if is_explicit_filename:
+            result['is_nsfw'] = True
+            result['confidence'] = 0.99
+            result['nsfw_score'] = 0.99
+            result['details']['reason'] = f'Explicit filename detected: {filename}'
+            result['analysis_methods'].append('explicit_filename')
+            return result  # Skip further analysis for explicit filenames
         
         # NSFW detection for images
         if result['file_type'] == 'image':
