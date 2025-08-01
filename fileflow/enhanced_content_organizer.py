@@ -380,9 +380,18 @@ class EnhancedContentOrganizer:
             logger.info("No files needed reorganization.")
 
 
-def organize_files():
-    """Main organize function that uses enhanced content-based organization."""
+def organize_files(sources=None, dest=None):
+    """Main organize function that uses enhanced content-based organization. CLI args can override config."""
     organizer = EnhancedContentOrganizer()
+    if sources is not None or dest is not None:
+        # Patch config for this run
+        config = organizer.get_enhanced_config()
+        if sources is not None:
+            config['source_directories'] = sources
+        if dest is not None:
+            # Send all categories to this dest for this ad-hoc run
+            config['destination_directories'] = {k: dest for k in config.get('destination_directories', {}).keys()}
+        organizer.config = config
     organizer.organize_files()
 
 
