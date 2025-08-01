@@ -533,6 +533,15 @@ class RobustContentClassifier:
             result['analysis_methods'] = ['non_media']
             return result  # Return SFW for non-media files
             
+        # First check filenames for explicit NSFW indicators
+        filename = file_path.name.lower()
+        explicit_terms = ['porn', 'xxx', 'nsfw', 'adult', 'sex', 'fuck', 'dick', 'pussy', 'nude', 'naked',
+                         'bdsm', 'fetish', 'hentai', 'blowjob', 'handjob', 'cum', 'creampie', 'anal',
+                         'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34']
+        
+        # Check if filename contains any explicit terms
+        is_explicit_filename = any(term in filename for term in explicit_terms)
+        
         # NSFW detection for images
         if result['file_type'] == 'image':
             # Analyze image with OpenCV
@@ -541,21 +550,33 @@ class RobustContentClassifier:
                 result['details']['opencv'] = opencv_analysis
                 result['analysis_methods'].append('opencv')
                 
-                # Only mark as NSFW if we have very high confidence
                 skin_percentage = opencv_analysis.get('skin_percentage', 0)
                 visual_score = opencv_analysis.get('visual_score', 0)
                 
-                # Very strict NSFW detection for images
-                if skin_percentage > 70 and visual_score > 0.8:
-                    result['is_nsfw'] = True
-                    result['confidence'] = 0.9
-                    result['nsfw_score'] = visual_score
-                    result['details']['reason'] = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                # If filename is explicit, require less visual evidence
+                if is_explicit_filename:
+                    if skin_percentage > 40 or visual_score > 0.6:
+                        result['is_nsfw'] = True
+                        result['confidence'] = 0.95
+                        result['nsfw_score'] = max(visual_score, 0.8)  # High confidence for explicit filenames
+                        result['details']['reason'] = f'Explicit filename with supporting visual evidence (skin: {skin_percentage:.1f}%, score: {visual_score:.2f})'
+                    else:
+                        result['is_nsfw'] = False
+                        result['confidence'] = 0.8
+                        result['nsfw_score'] = 0.2
+                        result['details']['reason'] = 'Explicit filename but no supporting visual evidence'
                 else:
-                    result['is_nsfw'] = False
-                    result['confidence'] = 0.9
-                    result['nsfw_score'] = 0.1
-                    result['details']['reason'] = 'No NSFW content detected'
+                    # For normal filenames, require very strong visual evidence
+                    if skin_percentage > 70 and visual_score > 0.85:
+                        result['is_nsfw'] = True
+                        result['confidence'] = 0.9
+                        result['nsfw_score'] = visual_score
+                        result['details']['reason'] = f'High confidence NSFW content (skin: {skin_percentage:.1f}%, score: {visual_score:.2f})'
+                    else:
+                        result['is_nsfw'] = False
+                        result['confidence'] = 0.9
+                        result['nsfw_score'] = 0.1
+                        result['details']['reason'] = 'No NSFW content detected'
         
         # NSFW detection for videos
         elif result['file_type'] == 'video':
@@ -574,17 +595,30 @@ class RobustContentClassifier:
                 nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
                 nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
                 
-                # Mark as NSFW if we find any NSFW frames with high confidence
-                if nsfw_frames and nsfw_confidence > 0.7:
-                    result['is_nsfw'] = True
-                    result['confidence'] = nsfw_confidence
-                    result['nsfw_score'] = nsfw_confidence
-                    result['details']['reason'] = f'Detected {len(nsfw_frames)} NSFW frames (max confidence: {nsfw_confidence:.2f})'
+                # If filename is explicit, require less visual evidence
+                if is_explicit_filename:
+                    if nsfw_frames or nsfw_confidence > 0.5:
+                        result['is_nsfw'] = True
+                        result['confidence'] = max(0.9, nsfw_confidence)
+                        result['nsfw_score'] = max(0.8, nsfw_confidence)
+                        result['details']['reason'] = f'Explicit filename with {len(nsfw_frames)} NSFW frames (max confidence: {nsfw_confidence:.2f})'
+                    else:
+                        result['is_nsfw'] = False
+                        result['confidence'] = 0.8
+                        result['nsfw_score'] = 0.2
+                        result['details']['reason'] = 'Explicit filename but no supporting visual evidence in frames'
                 else:
-                    result['is_nsfw'] = False
-                    result['confidence'] = 0.9
-                    result['nsfw_score'] = 0.1
-                    result['details']['reason'] = 'No NSFW content detected in sampled frames'
+                    # For normal filenames, require stronger evidence
+                    if nsfw_frames and nsfw_confidence > 0.8:
+                        result['is_nsfw'] = True
+                        result['confidence'] = nsfw_confidence
+                        result['nsfw_score'] = nsfw_confidence
+                        result['details']['reason'] = f'High confidence NSFW content in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
+                    else:
+                        result['is_nsfw'] = False
+                        result['confidence'] = 0.9
+                        result['nsfw_score'] = 0.1
+                        result['details']['reason'] = 'No NSFW content detected in sampled frames'
             else:
                 # Fallback to metadata analysis if frame analysis fails
                 result['is_nsfw'] = video_analysis.get('suspicion_score', 0) > 0.7
