@@ -224,14 +224,12 @@ class EnhancedContentOrganizer:
             logger.info(f"Organizing files in: {src_path}")
             if is_cli:
                 print(f"[FileFlow] Organizing files in: {src_path}")
-            for item in src_path.iterdir():
+            for item in src_path.rglob('*'):
                 if item.is_file():
                     try:
-                        # Get destination path and classification
                         dest_dir, classification = self.get_destination_path(item, config)
                         dest_dir.mkdir(parents=True, exist_ok=True)
                         dest_file = dest_dir / item.name
-                        
                         # Handle file name conflicts
                         counter = 1
                         original_dest = dest_file
@@ -240,23 +238,20 @@ class EnhancedContentOrganizer:
                             suffix = original_dest.suffix
                             dest_file = dest_dir / f"{stem}_{counter}{suffix}"
                             counter += 1
-                        
-                        # Move the file
                         shutil.move(str(item), str(dest_file))
-                        
-                        # Log classification details
                         if classification['is_nsfw']:
                             logger.info(f"NSFW: {item.name} -> {dest_file} ({classification['method']}: {classification.get('final_decision_reason', 'N/A')})")
                             moved_files['nsfw'] += 1
                         else:
                             logger.info(f"SFW: {item.name} -> {dest_file}")
                             moved_files['sfw'] += 1
-                        
                         # Update analysis statistics
                         method = classification.get('method', 'other')
                         if method in analysis_stats:
                             analysis_stats[method] += 1
-                        
+                        # CLI feedback
+                        if is_cli:
+                            print(f"[FileFlow] Moved {item} to {dest_file}")
                         # Send notification (respecting privacy settings)
                         if notify and (not classification['is_nsfw'] or notify_nsfw):
                             content_label = 'NSFW' if classification['is_nsfw'] else 'SFW'
@@ -265,10 +260,11 @@ class EnhancedContentOrganizer:
                                 f"FileFlow: {content_label} File Moved",
                                 f"{item.name} → {dest_dir.name} (confidence: {confidence:.1f})"
                             )
-                        
                     except Exception as e:
                         logger.error(f"Failed to move {item}: {e}")
                         moved_files['other'] += 1
+                        if is_cli:
+                            print(f"[FileFlow] Failed to move {item}: {e}")
         
         # Log summary
         total_moved = sum(moved_files.values())
