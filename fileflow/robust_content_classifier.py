@@ -930,7 +930,14 @@ def classify_media_file(self, file_path: Path) -> Dict:
         return result
     
     def should_classify_file(self, file_path: Path) -> bool:
-        """Check if a file should be content-classified."""
+        """Check if a file should be content-classified.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            bool: True if the file should be classified, False otherwise
+        """
         extension = file_path.suffix.lower()
         supported_extensions = {
             '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff',  # Images
