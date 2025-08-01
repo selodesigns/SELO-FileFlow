@@ -267,14 +267,19 @@ class EnhancedContentOrganizer:
                             confidence = classification.get('confidence', 0)
                             cat = 'NSFW' if classification.get('is_nsfw') else 'SFW'
                             print(f"[FileFlow] Moved {item} to {dest_file} [{cat}, {method}, confidence: {confidence:.2f}]")
-                        # Send notification (respecting privacy settings)
-                        if notify and (not classification['is_nsfw'] or notify_nsfw):
-                            content_label = 'NSFW' if classification['is_nsfw'] else 'SFW'
-                            confidence = classification.get('confidence', 0)
-                            send_notification(
-                                f"FileFlow: {content_label} File Moved",
-                                f"{item.name} → {dest_dir.name} (confidence: {confidence:.1f})"
-                            )
+                        # Disable all notifications in CLI/SSH mode
+                        import os
+                        if notify and not (os.environ.get('SSH_CONNECTION') or not sys.stdout.isatty()):
+                            if not classification['is_nsfw'] or notify_nsfw:
+                                content_label = 'NSFW' if classification['is_nsfw'] else 'SFW'
+                                confidence = classification.get('confidence', 0)
+                                try:
+                                    send_notification(
+                                        f"FileFlow: {content_label} File Moved",
+                                        f"{item.name} → {dest_dir.name} (confidence: {confidence:.1f})"
+                                    )
+                                except Exception:
+                                    pass
                     except Exception as e:
                         logger.error(f"Failed to move {item}: {e}")
                         moved_files['other'] += 1
