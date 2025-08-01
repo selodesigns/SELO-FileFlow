@@ -111,48 +111,93 @@ class RobustContentClassifier:
             logger.debug(f"Failed to save cache for {file_path.name}: {e}")
     
     def analyze_filename(self, file_path: Path) -> Dict:
-        """Analyze filename and directory path for NSFW indicators."""
+        """
+        Analyze filename and directory path for NSFW/SFW indicators.
+        
+        Returns:
+            Dict containing:
+            - is_explicit (bool): True if filename contains NSFW terms
+            - is_sfw (bool): True if filename contains strong SFW indicators
+            - reason (str): Explanation of the classification
+            - confidence (float): Confidence score (0.0-1.0)
+            - indicators (list): List of matched terms and their categories
+        """
         filename = file_path.name.lower()
-        parent_dirs = [p.name.lower() for p in file_path.parents if p.name]
+        parent_dirs = [p.lower() for p in file_path.parent.parts]
         
-        # Check for SFW indicators first
-        for indicator in self.sfw_indicators:
-            if indicator in filename:
-                return {
-                    'is_nsfw': False,
-                    'confidence': 0.8,
-                    'reason': f"SFW indicator: {indicator}",
-                    'method': 'filename_sfw'
-                }
+        result = {
+            'is_explicit': False,
+            'is_sfw': False,
+            'confidence': 0.0,
+            'reason': 'No explicit indicators found',
+            'indicators': []
+        }
         
-        # Check for NSFW keywords
         for category, keywords in self.nsfw_keywords.items():
             for keyword in keywords:
-                if keyword in filename:
-                    return {
-                        'is_nsfw': True,
-                        'confidence': 0.9,
-                        'reason': f"NSFW keyword ({category}): {keyword}",
-                        'method': 'filename_nsfw'
-                    }
+                if keyword in filename or any(keyword in d for d in parent_dirs):
+                    result['is_explicit'] = True
+                    result['confidence'] = 0.7
+                    result['reason'] = f"NSFW term ({category}): {keyword}"
+                    result['indicators'].append((keyword, category))
         
-        # Check parent directories
-        for dir_name in parent_dirs[:3]:
-            for category, keywords in self.nsfw_keywords.items():
-                for keyword in keywords:
-                    if keyword in dir_name:
-                        return {
-                            'is_nsfw': True,
-                            'confidence': 0.7,
-                            'reason': f"NSFW directory ({category}): {keyword}",
-                            'method': 'directory_nsfw'
-                        }
+        for keyword in self.sfw_indicators:
+            if keyword in filename or any(keyword in d for d in parent_dirs):
+                result['is_sfw'] = True
+                result['confidence'] = 0.9
+                result['reason'] = f"SFW indicator: {keyword}"
         
+        return result
+    
+    def analyze_filename_only(self, file_path: Path) -> Dict:
+        """
+        First pass: Analyze only the filename for NSFW indicators.
+        This is a quick check to identify potentially NSFW files before deeper analysis.
+        
+        Returns:
+            Dict with 'is_potentially_nsfw' flag and confidence score
+        """
+        filename = file_path.name.lower()
+        parent_dirs = [p.lower() for p in file_path.parent.parts]
+        
+        explicit_terms = [
+            'porn', 'xxx', 'nsfw', 'adult', 'sex', 'fuck', 'dick', 'pussy', 'nude', 'naked',
+            'bdsm', 'fetish', 'hentai', 'blowjob', 'handjob', 'cum', 'creampie', 'anal',
+            'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34',
+            'cock', 'ass', 'boob', 'tits', 'titties', 'pornstar', 'xxxvideo', 'xxxpic',
+            'hardcore', 'facial', 'orgy', 'threesome', 'gangbang', 'bukkake', 'bondage'
+        ]
+        
+        sfw_indicators = [
+            'family', 'kids', 'children', 'baby', 'wedding', 'graduation',
+            'vacation', 'travel', 'nature', 'landscape', 'food', 'recipe',
+            'tutorial', 'education', 'work', 'business', 'meeting'
+        ]
+        
+        if any(term in filename or any(term in d for d in parent_dirs) for term in sfw_indicators):
+            return {
+                'is_potentially_nsfw': False,
+                'confidence': 0.9,
+                'reason': 'SFW indicators found in filename/path',
+                'requires_content_analysis': False
+            }
+        
+        nsfw_indicators = [term for term in explicit_terms 
+                          if term in filename or any(term in d for d in parent_dirs)]
+        
+        if nsfw_indicators:
+            return {
+                'is_potentially_nsfw': True,
+                'confidence': min(0.8, 0.5 + (len(nsfw_indicators) * 0.1)),
+                'reason': f'Potential NSFW indicators: {", ".join(nsfw_indicators)}',
+                'requires_content_analysis': True
+            }
+            
         return {
-            'is_nsfw': False,
-            'confidence': 0.3,
-            'reason': "No obvious indicators in filename",
-            'method': 'filename_neutral'
+            'is_potentially_nsfw': False,
+            'confidence': 0.7,
+            'reason': 'No explicit indicators found',
+            'requires_content_analysis': True  # Always require content analysis
         }
     
     def analyze_file_properties(self, file_path: Path) -> Dict:
@@ -492,29 +537,79 @@ class RobustContentClassifier:
             'file_path': str(file_path),
             'exif_analysis': exif_analysis,
             'exif_summary': exif_summary,
-            'analysis_methods': exif_analysis.get('analysis_methods', []),
-            'has_exif': exif_analysis.get('has_exif', False),
-            'exif_score': exif_analysis.get('exif_score', 0.0),
-            'confidence': exif_analysis.get('confidence', 0.0)
+            'analysis_methods': exif_analysis.get('analysis_methods', [])
         }
     
-    def classify_media_file(self, file_path: Path) -> Dict:
-        """Classify a media file using visual analysis only."""
-        # Check cache first
-        cached_result = self.get_cached_result(file_path)
-        if cached_result:
-            logger.debug(f"Using cached result for {file_path.name}")
-            return cached_result
+    def analyze_filename_only(self, file_path: Path) -> Dict:
+        """
+        First pass: Analyze only the filename for NSFW indicators.
+        This is a quick check to identify potentially NSFW files before deeper analysis.
         
-        # Initialize result as SFW by default
+        Returns:
+            Dict with 'is_potentially_nsfw' flag and confidence score
+        """
+        filename = file_path.name.lower()
+        parent_dirs = [p.lower() for p in file_path.parent.parts]
+        
+        # Check for explicit NSFW terms
+        explicit_terms = [
+            'porn', 'xxx', 'nsfw', 'adult', 'sex', 'fuck', 'dick', 'pussy', 'nude', 'naked',
+            'bdsm', 'fetish', 'hentai', 'blowjob', 'handjob', 'cum', 'creampie', 'anal',
+            'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34',
+            'cock', 'ass', 'boob', 'tits', 'titties', 'pornstar', 'xxxvideo', 'xxxpic',
+            'hardcore', 'facial', 'orgy', 'threesome', 'gangbang', 'bukkake', 'bondage'
+        ]
+        
+        # Check for SFW indicators that would override NSFW detection
+        sfw_indicators = [
+            'family', 'kids', 'children', 'baby', 'wedding', 'graduation',
+            'vacation', 'travel', 'nature', 'landscape', 'food', 'recipe',
+            'tutorial', 'education', 'work', 'business', 'meeting'
+        ]
+        
+        # Check for SFW indicators first
+        if any(term in filename or any(term in d for d in parent_dirs) for term in sfw_indicators):
+            return {
+                'is_potentially_nsfw': False,
+                'confidence': 0.9,
+                'reason': 'SFW indicators found in filename/path',
+                'requires_content_analysis': False
+            }
+        
+        # Check for NSFW indicators
+        nsfw_indicators = [term for term in explicit_terms 
+                          if term in filename or any(term in d for d in parent_dirs)]
+        
+        if nsfw_indicators:
+            return {
+                'is_potentially_nsfw': True,
+                'confidence': min(0.8, 0.5 + (len(nsfw_indicators) * 0.1)),
+                'reason': f'Potential NSFW indicators: {", ".join(nsfw_indicators)}',
+                'requires_content_analysis': True
+            }
+            
+        return {
+            'is_potentially_nsfw': False,
+            'confidence': 0.7,
+            'reason': 'No explicit indicators found',
+            'requires_content_analysis': True  # Always require content analysis
+        }
+
+    def analyze_content(self, file_path: Path, filename_analysis: Dict = None) -> Dict:
+        """
+        Second pass: Analyze file content to confirm/override filename analysis.
+        """
+        # Initialize result
         result = {
             'file_path': str(file_path),
-            'file_type': 'unknown',
-            'is_nsfw': False,  # Default to SFW
+            'file_type': '',
+            'is_nsfw': False,
             'confidence': 0.0,
             'nsfw_score': 0.0,
             'analysis_methods': [],
-            'details': {}
+            'details': {
+                'filename_analysis': filename_analysis or {}
+            }
         }
         
         # Determine file type
@@ -528,30 +623,147 @@ class RobustContentClassifier:
             result['file_type'] = 'video'
         else:
             result['file_type'] = 'other'
+            result['is_nsfw'] = False
+            result['confidence'] = 1.0
+            result['analysis_methods'] = ['non_media']
+            return result
+            
+        # Analyze content based on file type
+        if result['file_type'] == 'image':
+            # Use OpenCV for image analysis
+            opencv_analysis = self.analyze_image_with_opencv(file_path)
+            if 'error' not in opencv_analysis:
+                result['details']['opencv'] = opencv_analysis
+                result['analysis_methods'].append('opencv')
+                
+                skin_percentage = opencv_analysis.get('skin_percentage', 0)
+                visual_score = opencv_analysis.get('visual_score', 0)
+                
+                # High confidence NSFW detection
+                if skin_percentage > 60 and visual_score > 0.7:  # Adjusted thresholds
+                    result.update({
+                        'is_nsfw': True,
+                        'confidence': visual_score,
+                        'nsfw_score': visual_score,
+                        'details': {
+                            **result['details'],
+                            'reason': f'High confidence NSFW content (skin: {skin_percentage:.1f}%, score: {visual_score:.2f})'
+                    }
+                })
+            else:
+                result.update({
+                    'is_nsfw': False,
+                    'confidence': max(0.8, 1.0 - visual_score),  # Higher confidence for low NSFW scores
+                    'nsfw_score': visual_score,
+                    'details': {
+                        **result['details'],
+                        'reason': 'No NSFW content detected in image analysis'
+                    }
+                })
+        
+        elif result['file_type'] == 'video':
+            # Analyze video metadata and sample frames
+            video_analysis = self.analyze_video_metadata(file_path)
+            result['details']['video_metadata'] = video_analysis
+            result['analysis_methods'].append('video_metadata')
+            
+            # Sample and analyze frames
+            frame_analysis = self.analyze_video_frames(file_path, sample_count=5)
+            if frame_analysis:
+                result['details']['frame_analysis'] = frame_analysis
+                result['analysis_methods'].append('frame_analysis')
+                
+                # Get max NSFW score from frames
+                nsfw_scores = [f.get('nsfw_score', 0) for f in frame_analysis]
+                max_nsfw_score = max(nsfw_scores) if nsfw_scores else 0
+                
+                if max_nsfw_score > 0.8:  # High confidence threshold
+                    result.update({
+                        'is_nsfw': True,
+                        'confidence': max_nsfw_score,
+                        'nsfw_score': max_nsfw_score,
+                        'details': {
+                            **result['details'],
+                            'reason': f'High confidence NSFW content in video frames (max score: {max_nsfw_score:.2f})'
+                        }
+                    })
+                else:
+                    result.update({
+                        'is_nsfw': False,
+                        'confidence': 0.9,
+                        'nsfw_score': max_nsfw_score,
+                        'details': {
+                            **result['details'],
+                            'reason': 'No NSFW content detected in video frames'
+                        }
+                    })
+        
+        return result
+
+def classify_media_file(self, file_path: Path) -> Dict:
+    """
+    Classify a media file using a two-pass system:
+    1. First pass: Quick filename analysis
+    2. Second pass: Content analysis for all files
+    """
+    # Check cache first
+    cached_result = self.get_cached_result(file_path)
+    if cached_result:
+        return cached_result
+        
+    # First pass: Filename analysis
+    filename_analysis = self.analyze_filename_only(file_path)
+    
+    # If filename analysis is very confident, we can skip content analysis for SFW
+    if (not filename_analysis['is_potentially_nsfw'] and 
+        filename_analysis['confidence'] >= 0.9 and
+        not filename_analysis['requires_content_analysis']):
+        
+        result = {
+            'file_path': str(file_path),
+            'file_type': 'other' if file_path.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'} 
+                        else 'image' if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff'} else 'video',
+            'is_nsfw': False,
+            'confidence': filename_analysis['confidence'],
+            'nsfw_score': 0.0,
+            'analysis_methods': ['filename_analysis'],
+            'details': {
+                'filename_analysis': filename_analysis,
+                'reason': 'High confidence SFW from filename analysis'
+            }
+        }
+        
+        if extension in image_extensions:
+            result['file_type'] = 'image'
+        elif extension in video_extensions:
+            result['file_type'] = 'video'
+        else:
+            result['file_type'] = 'other'
             result['is_nsfw'] = False  # Explicitly mark non-media as SFW
             result['confidence'] = 1.0
             result['analysis_methods'] = ['non_media']
             return result  # Return SFW for non-media files
             
-        # First check filenames for explicit NSFW indicators
-        filename = file_path.name.lower()
-        explicit_terms = ['porn', 'xxx', 'nsfw', 'adult', 'sex', 'fuck', 'dick', 'pussy', 'nude', 'naked',
-                         'bdsm', 'fetish', 'hentai', 'blowjob', 'handjob', 'cum', 'creampie', 'anal',
-                         'milf', 'lesbian', 'gay', 'shemale', 'tranny', 'futa', 'yiff', 'rule34',
-                         'cock', 'ass', 'boob', 'tits', 'titties', 'pornstar', 'xxxvideo', 'xxxpic',
-                         'hardcore', 'facial', 'orgy', 'threesome', 'gangbang', 'bukkake', 'bdsm', 'bondage']
+        # 1. First, analyze the filename and path for NSFW indicators
+        filename_analysis = self.analyze_filename(file_path)
+        result['details']['filename_analysis'] = filename_analysis
         
-        # Check if filename contains any explicit terms
-        is_explicit_filename = any(term in filename for term in explicit_terms)
-        
-        # If filename is explicit, mark as NSFW immediately with high confidence
-        if is_explicit_filename:
+        # 2. If filename is explicitly NSFW, return immediately with high confidence
+        if filename_analysis.get('is_explicit', False):
             result['is_nsfw'] = True
             result['confidence'] = 0.99
             result['nsfw_score'] = 0.99
-            result['details']['reason'] = f'Explicit filename detected: {filename}'
+            result['details']['reason'] = f'Explicit filename detected: {filename_analysis["reason"]}'
             result['analysis_methods'].append('explicit_filename')
             return result  # Skip further analysis for explicit filenames
+            
+        # 3. If filename is explicitly SFW, trust it unless content strongly suggests otherwise
+        if filename_analysis.get('is_sfw', False):
+            result['is_nsfw'] = False
+            result['confidence'] = 0.9
+            result['nsfw_score'] = 0.1
+            result['details']['reason'] = f'Explicitly SFW filename: {filename_analysis["reason"]}'
+            result['analysis_methods'].append('explicit_sfw_filename')
         
         # NSFW detection for images
         if result['file_type'] == 'image':
