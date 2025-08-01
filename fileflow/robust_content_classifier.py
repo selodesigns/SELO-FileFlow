@@ -313,53 +313,153 @@ class RobustContentClassifier:
             return {'error': str(e)}
     
     def analyze_video_metadata(self, file_path: Path) -> Dict:
-        """Analyze video file metadata."""
+        """Analyze video metadata for NSFW indicators."""
+        if not self.has_ffmpeg:
+            return {'error': 'FFmpeg not available for video analysis'}
+        
         try:
-            # Try to get basic video info using ffprobe if available
-            try:
-                cmd = [
-                    'ffprobe', '-v', 'quiet', '-print_format', 'json',
-                    '-show_format', '-show_streams', str(file_path)
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-                
-                if result.returncode == 0:
-                    import json
-                    metadata = json.loads(result.stdout)
-                    
-                    # Extract relevant information
-                    format_info = metadata.get('format', {})
-                    duration = float(format_info.get('duration', 0))
-                    size_mb = int(format_info.get('size', 0)) / (1024 * 1024)
-                    
-                    # Calculate suspicion based on video characteristics
-                    suspicion_score = 0.0
-                    
-                    # Very long videos might be adult content
-                    if duration > 3600:  # > 1 hour
-                        suspicion_score += 0.2
-                    elif duration > 1800:  # > 30 minutes
-                        suspicion_score += 0.1
-                    
-                    # High bitrate for duration might indicate high-quality adult content
-                    if duration > 0:
-                        bitrate = (size_mb * 8) / (duration / 60)  # Mbps
-                        if bitrate > 10:
-                            suspicion_score += 0.1
-                    
-                    return {
-                        'duration': duration,
-                        'size_mb': size_mb,
-                        'suspicion_score': suspicion_score,
-                        'has_metadata': True
-                    }
-                    
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
-                logger.debug(f"ffprobe not available or failed for {file_path}")
+            import subprocess
+            import json
             
-            # Fallback to basic file analysis
-            stat = file_path.stat()
-            size_mb = stat.st_size / (1024 * 1024)
+            # Get video metadata using FFprobe
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-show_entries', 'format=duration:stream=width,height,bit_rate,duration',
+                '-of', 'json',
+                str(file_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return {'error': f'FFprobe error: {result.stderr}'}
+            
+            metadata = json.loads(result.stdout)
+            
+            # Analyze video properties
+            video_stream = next((s for s in metadata.get('streams', []) if s.get('codec_type') == 'video'), {})
+            
+            # Calculate suspicion score based on video properties
+            suspicion_score = 0.0
+            
+            # Check for suspicious duration
+            duration = float(metadata.get('format', {}).get('duration', 0))
+            if 60 < duration < 300:  # 1-5 minute videos might be more likely to be NSFW
+                suspicion_score += 0.2
+                
+            # Check for common NSFW video resolutions
+            width = int(video_stream.get('width', 0))
+            height = int(video_stream.get('height', 0))
+            if width > 0 and height > 0:
+                if width == 1920 and height == 1080:  # Common HD resolution
+                    suspicion_score += 0.1
+                elif width == 1280 and height == 720:  # Common HD resolution
+                    suspicion_score += 0.1
+                    
+            return {
+                'duration': duration,
+                'width': width,
+                'height': height,
+                'bitrate': int(video_stream.get('bit_rate', 0)) if video_stream.get('bit_rate') else None,
+                'suspicion_score': min(suspicion_score, 1.0)
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error analyzing video metadata: {e}")
+            return {'error': str(e)}
+            
+    def analyze_video_frames(self, file_path: Path, sample_count: int = 5) -> List[Dict]:
+        """Analyze sampled frames from a video for NSFW content."""
+        if not self.has_ffmpeg or not self.has_opencv:
+            return []
+            
+        try:
+            import cv2
+            import numpy as np
+            import tempfile
+            import subprocess
+            import os
+            
+            # Get video duration
+            duration = self.get_video_duration(file_path)
+            if not duration or duration <= 0:
+                return []
+                
+            # Calculate frame timestamps to sample
+            timestamps = [i * (duration / (sample_count + 1)) for i in range(1, sample_count + 1)]
+            
+            frame_results = []
+            
+            # Extract and analyze frames at calculated timestamps
+            for i, timestamp in enumerate(timestamps):
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
+                    temp_path = temp_frame.name
+                
+                try:
+                    # Extract frame using FFmpeg
+                    cmd = [
+                        'ffmpeg',
+                        '-ss', str(timestamp),
+                        '-i', str(file_path),
+                        '-vframes', '1',
+                        '-q:v', '2',
+                        '-y',  # Overwrite output file if it exists
+                        temp_path
+                    ]
+                    
+                    subprocess.run(cmd, capture_output=True, check=True)
+                    
+                    # Analyze the extracted frame
+                    frame_analysis = self.analyze_image_with_opencv(Path(temp_path))
+                    
+                    # Add frame position info
+                    frame_analysis['timestamp'] = timestamp
+                    frame_analysis['frame_number'] = i + 1
+                    
+                    # Only include successful analyses
+                    if 'error' not in frame_analysis:
+                        frame_results.append(frame_analysis)
+                        
+                except Exception as e:
+                    logger.debug(f"Error analyzing video frame at {timestamp}s: {e}")
+                finally:
+                    # Clean up temporary frame file
+                    try:
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                    except Exception as e:
+                        logger.debug(f"Error cleaning up temp frame: {e}")
+            
+            return frame_results
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_video_frames: {e}")
+            return []
+    
+    def get_video_duration(self, file_path: Path) -> float:
+        """Get video duration in seconds using FFprobe."""
+        try:
+            import subprocess
+            import json
+            
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'json',
+                str(file_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return 0.0
+                
+            metadata = json.loads(result.stdout)
+            return float(metadata.get('format', {}).get('duration', 0))
+            
+        except Exception as e:
+            logger.debug(f"Error getting video duration: {e}")
+            return 0.0
             
             suspicion_score = 0.0
             if size_mb > 1000:  # > 1GB
@@ -399,18 +499,18 @@ class RobustContentClassifier:
         }
     
     def classify_media_file(self, file_path: Path) -> Dict:
-        """Classify a media file using all available analysis methods."""
+        """Classify a media file using visual analysis only."""
         # Check cache first
         cached_result = self.get_cached_result(file_path)
         if cached_result:
             logger.debug(f"Using cached result for {file_path.name}")
             return cached_result
         
-        # Initialize result
+        # Initialize result as SFW by default
         result = {
             'file_path': str(file_path),
             'file_type': 'unknown',
-            'is_nsfw': False,
+            'is_nsfw': False,  # Default to SFW
             'confidence': 0.0,
             'nsfw_score': 0.0,
             'analysis_methods': [],
@@ -428,16 +528,81 @@ class RobustContentClassifier:
             result['file_type'] = 'video'
         else:
             result['file_type'] = 'other'
+            result['is_nsfw'] = False  # Explicitly mark non-media as SFW
+            result['confidence'] = 1.0
+            result['analysis_methods'] = ['non_media']
+            return result  # Return SFW for non-media files
+            
+        # NSFW detection for images
+        if result['file_type'] == 'image':
+            # Analyze image with OpenCV
+            opencv_analysis = self.analyze_image_with_opencv(file_path)
+            if 'error' not in opencv_analysis:
+                result['details']['opencv'] = opencv_analysis
+                result['analysis_methods'].append('opencv')
+                
+                # Only mark as NSFW if we have very high confidence
+                skin_percentage = opencv_analysis.get('skin_percentage', 0)
+                visual_score = opencv_analysis.get('visual_score', 0)
+                
+                # Very strict NSFW detection for images
+                if skin_percentage > 70 and visual_score > 0.8:
+                    result['is_nsfw'] = True
+                    result['confidence'] = 0.9
+                    result['nsfw_score'] = visual_score
+                    result['details']['reason'] = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                else:
+                    result['is_nsfw'] = False
+                    result['confidence'] = 0.9
+                    result['nsfw_score'] = 0.1
+                    result['details']['reason'] = 'No NSFW content detected'
         
-        # 1. Filename analysis (always available)
-        filename_analysis = self.analyze_filename(file_path)
-        result['details']['filename'] = filename_analysis
-        result['analysis_methods'].append('filename')
+        # NSFW detection for videos
+        elif result['file_type'] == 'video':
+            # First check video metadata
+            video_analysis = self.analyze_video_metadata(file_path)
+            result['details']['video'] = video_analysis
+            result['analysis_methods'].append('video_metadata')
+            
+            # Sample frames for visual analysis
+            frame_analysis = self.analyze_video_frames(file_path, sample_count=5)
+            if frame_analysis:
+                result['details']['frame_analysis'] = frame_analysis
+                result['analysis_methods'].append('frame_analysis')
+                
+                # Check if any sampled frame indicates NSFW content
+                nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
+                nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
+                
+                # Mark as NSFW if we find any NSFW frames with high confidence
+                if nsfw_frames and nsfw_confidence > 0.7:
+                    result['is_nsfw'] = True
+                    result['confidence'] = nsfw_confidence
+                    result['nsfw_score'] = nsfw_confidence
+                    result['details']['reason'] = f'Detected {len(nsfw_frames)} NSFW frames (max confidence: {nsfw_confidence:.2f})'
+                else:
+                    result['is_nsfw'] = False
+                    result['confidence'] = 0.9
+                    result['nsfw_score'] = 0.1
+                    result['details']['reason'] = 'No NSFW content detected in sampled frames'
+            else:
+                # Fallback to metadata analysis if frame analysis fails
+                result['is_nsfw'] = video_analysis.get('suspicion_score', 0) > 0.7
+                result['confidence'] = 0.7
+                result['nsfw_score'] = video_analysis.get('suspicion_score', 0)
+                result['details']['reason'] = 'Using video metadata analysis only'
         
-        # Start with filename analysis results
-        result['is_nsfw'] = filename_analysis['is_nsfw']
-        result['confidence'] = filename_analysis['confidence']
-        result['nsfw_score'] = 0.8 if filename_analysis['is_nsfw'] else 0.2
+        # For other file types, use basic analysis
+        else:
+            # Basic analysis for non-media files
+            result['is_nsfw'] = False
+            result['confidence'] = 1.0
+            result['nsfw_score'] = 0.0
+            result['details']['reason'] = 'Non-media file - treated as SFW'
+        
+        # Cache and return
+        self.save_cached_result(file_path, result)
+        return result
         
         # 2. File properties analysis
         properties_analysis = self.analyze_file_properties(file_path)
