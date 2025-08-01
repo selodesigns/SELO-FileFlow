@@ -5,7 +5,7 @@
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.5+-green.svg)](https://opencv.org/)
 [![ExifTool](https://img.shields.io/badge/ExifTool-12.0+-blue.svg)](https://exiftool.org/)
 
-**FileFlow** is a sophisticated, AI-powered media content classification and organization system that goes far beyond simple filename-based sorting. Using advanced computer vision, comprehensive EXIF metadata analysis, and multi-layered content detection, FileFlow automatically separates NSFW and SFW media content with professional-grade accuracy.
+**FileFlow** is a sophisticated, AI-powered media content classification and organization system that goes far beyond simple filename-based sorting. Using advanced computer vision, comprehensive EXIF metadata analysis, and multi-layered content detection, FileFlow automatically separates media content with professional-grade accuracy.
 
 > 🎯 **Perfect for**: Content creators, digital archivists, photographers, and anyone managing large mixed media collections that need intelligent content-based organization.
 
