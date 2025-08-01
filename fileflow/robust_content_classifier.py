@@ -468,17 +468,20 @@ class RobustContentClassifier:
                 # Use visual analysis to override or confirm filename analysis
                 visual_score = opencv_analysis.get('visual_score', 0)
                 skin_percentage = opencv_analysis.get('skin_percentage', 0)
-                
-                # If visual analysis strongly suggests NSFW
-                if visual_score > 0.6 or skin_percentage > 30:
+
+                # Revised: Require BOTH high skin percentage and high visual score for NSFW
+                # Only mark NSFW if skin_percentage > 60 and visual_score > 0.6
+                if skin_percentage > 60 and visual_score > 0.6:
                     result['is_nsfw'] = True
-                    result['confidence'] = max(result['confidence'], 0.8)
+                    result['confidence'] = max(result['confidence'], 0.9)
                     result['nsfw_score'] = max(result['nsfw_score'], visual_score)
                 # If visual analysis strongly suggests SFW and filename was uncertain
                 elif visual_score < 0.2 and skin_percentage < 10 and result['confidence'] < 0.7:
                     result['is_nsfw'] = False
                     result['confidence'] = 0.7
                     result['nsfw_score'] = min(result['nsfw_score'], visual_score)
+                # Otherwise, do not override filename-based or other analysis
+                # (prevents false positives for normal photos with some skin tones)
         
         elif result['file_type'] == 'video':
             video_analysis = self.analyze_video_metadata(file_path)
