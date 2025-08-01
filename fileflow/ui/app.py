@@ -3,8 +3,10 @@ from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QSystemTrayIcon, QMenu, QAction, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QLineEdit, QFormLayout, QInputDialog, QStatusBar, QCheckBox, QSlider, QSpinBox, QGroupBox, QTextEdit, QSizePolicy
 )
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtGui import QIcon, QFont, QColor
 from PyQt5.QtCore import Qt, QEvent
+import subprocess
+import os
 from ..config import load_config, save_config, CONFIG_FILE
 from ..organizer import organize_files, reorganize_existing_files
 
@@ -68,15 +70,46 @@ class FileFlowMainWindow(QMainWindow):
         print('init_ui: QTabWidget created')
         # Folders Tab - Enhanced with descriptions
         folders_tab = QWidget()
+        folders_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         folders_layout = QVBoxLayout()
+        folders_layout.setSpacing(10)  # Add consistent spacing
+        folders_layout.setContentsMargins(10, 10, 10, 10)  # Add margins for better appearance
         
-        # Add main description
+        # Add enhanced main description with status
         main_desc = QLabel(
             '<h3>📁 Folder Configuration</h3>'
-            '<p>Configure where FileFlow should look for files to organize (sources) and where to move them (destinations).</p>'
+            '<p>Configure where FileFlow should look for files to organize (sources) and where to move them (destinations). '
+            'FileFlow will automatically monitor source folders and organize files into your destination structure.</p>'
         )
         main_desc.setWordWrap(True)
         folders_layout.addWidget(main_desc)
+        
+        # Add configuration status section
+        status_frame = QWidget()
+        status_layout = QHBoxLayout()
+        status_frame.setStyleSheet('background-color: #f0f0f0; border: 1px solid #ddd; border-radius: 5px; padding: 5px;')
+        
+        # Count configured items
+        source_count = len(config.get('source_directories', []))
+        dest_count = len(config.get('destination_directories', {}))
+        
+        status_label = QLabel(
+            f'📊 <b>Current Status:</b> {source_count} source folder(s), {dest_count} destination(s) configured'
+        )
+        status_label.setStyleSheet('color: #333; font-size: 12px; padding: 5px;')
+        status_layout.addWidget(status_label)
+        
+        # Add quick setup button
+        btn_quick_setup = QPushButton('Quick Setup Guide')
+        btn_quick_setup.setToolTip('Get help setting up your first source and destination folders')
+        btn_quick_setup.setMaximumWidth(150)
+        btn_quick_setup.setStyleSheet('QPushButton { background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 3px; padding: 5px; }')
+        btn_quick_setup.clicked.connect(self.show_quick_setup_guide)
+        status_layout.addWidget(btn_quick_setup)
+        
+        status_layout.addStretch()
+        status_frame.setLayout(status_layout)
+        folders_layout.addWidget(status_frame)
         
         # Source Directories Section
         source_group = QGroupBox('📥 Source Directories')
@@ -87,17 +120,32 @@ class FileFlowMainWindow(QMainWindow):
             '<b>What are Source Directories?</b><br>'
             'These are folders where FileFlow looks for files to organize. Add folders like Downloads, '
             'Desktop, or any location where you save mixed media files. FileFlow will automatically '
-            'sort files from these locations using advanced content classification.'
+            'sort files from these locations using advanced content classification.<br><br>'
+            '<b>💡 Common Examples:</b> ~/Downloads, ~/Desktop, ~/Pictures/Unsorted, ~/Documents/ToSort'
         )
         source_desc.setWordWrap(True)
-        source_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px;')
+        source_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px; background-color: #f9f9f9; padding: 8px; border-radius: 4px;')
         source_layout.addWidget(source_desc)
         
+        # Source list with enhanced display
         self.source_list = QListWidget()
-        self.source_list.setToolTip('List of folders FileFlow monitors for new files to organize')
+        self.source_list.setToolTip('List of folders FileFlow monitors for new files to organize\nDouble-click to open folder in file manager')
         self.source_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.source_list.setAlternatingRowColors(True)
+        self.source_list.itemDoubleClicked.connect(self.open_folder_in_manager)
+        
+        # Populate with validation indicators
         for src in config.get('source_directories', []):
-            self.source_list.addItem(QListWidgetItem(src))
+            item = QListWidgetItem()
+            if Path(src).exists():
+                item.setText(f'✅ {src}')
+                item.setToolTip(f'Valid source directory: {src}')
+            else:
+                item.setText(f'❌ {src}')
+                item.setToolTip(f'Directory not found: {src}')
+                item.setBackground(QColor(255, 240, 240))  # Light red background
+            self.source_list.addItem(item)
+        
         source_layout.addWidget(self.source_list, 1)  # Add stretch factor
         
         # Source buttons with improved legibility
@@ -117,9 +165,18 @@ class FileFlowMainWindow(QMainWindow):
         btn_remove_source.clicked.connect(self.remove_selected_source)
         btn_remove_source.setMinimumHeight(30)
         
+        # Add validation/refresh button
+        btn_validate_sources = QPushButton('Validate')
+        btn_validate_sources.setToolTip('Check if all source folders exist and refresh the display')
+        btn_validate_sources.clicked.connect(self.validate_and_refresh_folders)
+        btn_validate_sources.setMinimumHeight(30)
+        btn_validate_sources.setMaximumWidth(80)
+        btn_validate_sources.setStyleSheet('QPushButton { background-color: #fff3cd; border: 1px solid #ffeaa7; }')
+        
         source_btn_layout.addWidget(btn_add_source)
         source_btn_layout.addWidget(btn_browse_source)
         source_btn_layout.addWidget(btn_remove_source)
+        source_btn_layout.addWidget(btn_validate_sources)
         source_layout.addLayout(source_btn_layout)
         source_group.setLayout(source_layout)
         folders_layout.addWidget(source_group, 1)  # Add stretch factor
@@ -133,17 +190,32 @@ class FileFlowMainWindow(QMainWindow):
             '<b>What are Destination Directories?</b><br>'
             'These are organized folders where FileFlow moves sorted files. Each category (Images, Videos, '
             'Documents, etc.) gets its own destination folder. FileFlow will create NSFW and SFW subfolders '
-            'within each category for intelligent content separation.'
+            'within each category for intelligent content separation.<br><br>'
+            '<b>💡 Example Structure:</b> ~/Organized/Images/ → ~/Organized/Images/SFW/ & ~/Organized/Images/NSFW/'
         )
         dest_desc.setWordWrap(True)
-        dest_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px;')
+        dest_desc.setStyleSheet('color: #666; font-size: 11px; margin: 5px; background-color: #f9f9f9; padding: 8px; border-radius: 4px;')
         dest_layout.addWidget(dest_desc)
         
+        # Destination list with enhanced display
         self.dest_list = QListWidget()
-        self.dest_list.setToolTip('List of organized destination folders for each file category')
+        self.dest_list.setToolTip('List of organized destination folders for each file category\nDouble-click to open folder in file manager')
         self.dest_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.dest_list.setAlternatingRowColors(True)
+        self.dest_list.itemDoubleClicked.connect(self.open_folder_in_manager)
+        
+        # Populate with validation indicators
         for cat, dst in config.get('destination_directories', {}).items():
-            self.dest_list.addItem(QListWidgetItem(f'{cat}: {dst}'))
+            item = QListWidgetItem()
+            if Path(dst).exists():
+                item.setText(f'✅ {cat}: {dst}')
+                item.setToolTip(f'Valid destination: {cat} → {dst}')
+            else:
+                item.setText(f'❌ {cat}: {dst}')
+                item.setToolTip(f'Directory not found: {cat} → {dst}')
+                item.setBackground(QColor(255, 240, 240))  # Light red background
+            self.dest_list.addItem(item)
+        
         dest_layout.addWidget(self.dest_list, 1)  # Add stretch factor
         
         # Destination buttons with improved legibility
@@ -197,9 +269,11 @@ class FileFlowMainWindow(QMainWindow):
         
         # File Types Tab - Enhanced with descriptions
         file_types_tab = QWidget()
+        file_types_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         file_types_layout = QVBoxLayout()
+        file_types_layout.setSpacing(10)
+        file_types_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Add main description for File Types
         types_main_desc = QLabel(
             '<h3>📋 File Type Categories</h3>'
             '<p>Configure which file extensions belong to each category. FileFlow uses these rules to '
@@ -259,7 +333,10 @@ class FileFlowMainWindow(QMainWindow):
         
         # Custom Mappings Tab - Enhanced with descriptions
         mappings_tab = QWidget()
+        mappings_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         mappings_layout = QVBoxLayout()
+        mappings_layout.setSpacing(10)
+        mappings_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add main description for Custom Mappings
         mappings_main_desc = QLabel(
@@ -327,7 +404,10 @@ class FileFlowMainWindow(QMainWindow):
         
         # Content Classification Tab - Enhanced with descriptions
         classification_tab = QWidget()
+        classification_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         classification_layout = QVBoxLayout()
+        classification_layout.setSpacing(10)
+        classification_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add main description for Content Classification
         classification_main_desc = QLabel(
@@ -559,7 +639,10 @@ class FileFlowMainWindow(QMainWindow):
         
         # Settings Tab - Enhanced with descriptions
         settings_tab = QWidget()
+        settings_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         settings_layout = QVBoxLayout()
+        settings_layout.setSpacing(10)
+        settings_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add main description for Settings
         settings_main_desc = QLabel(
@@ -758,9 +841,21 @@ class FileFlowMainWindow(QMainWindow):
         settings_tab.setLayout(settings_layout)
         tabs.addTab(settings_tab, 'Settings')
 
-        self.setCentralWidget(tabs)
+        # Create main widget and layout for proper resizing
+        main_widget = QWidget()
+        main_layout = QVBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins for full use of space
+        main_layout.addWidget(tabs)
+        
+        # Set proper size policies for responsive resizing
+        main_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        self.setCentralWidget(main_widget)
+        
         # Status bar
         self.statusbar = QStatusBar()
+        self.statusbar.setSizeGripEnabled(True)  # Enable resize grip
         self.setStatusBar(self.statusbar)
 
     # Custom mappings management
@@ -864,6 +959,134 @@ class FileFlowMainWindow(QMainWindow):
             self.showNormal()
             self.raise_()
             self.activateWindow()
+    
+    def show_quick_setup_guide(self):
+        """Show a quick setup guide for new users."""
+        guide_text = (
+            '<h3>🚀 Quick Setup Guide</h3>'
+            '<p>Follow these steps to get FileFlow working:</p>'
+            '<ol>'
+            '<li><b>Add Source Folders:</b><br>'
+            '   • Click "Browse..." to select folders like Downloads, Desktop<br>'
+            '   • These are folders FileFlow will monitor for new files</li><br>'
+            '<li><b>Add Destination Categories:</b><br>'
+            '   • Click "Add Destination" to create organized folders<br>'
+            '   • Example: "Images" → ~/Organized/Images/</li><br>'
+            '<li><b>Configure File Types:</b><br>'
+            '   • Go to "File Types" tab to set which extensions go where<br>'
+            '   • Example: jpg,png,gif → Images category</li><br>'
+            '<li><b>Enable Content Classification:</b><br>'
+            '   • Go to "Content Classification" tab<br>'
+            '   • Enable advanced NSFW/SFW separation</li><br>'
+            '<li><b>Start Organizing:</b><br>'
+            '   • Go to "Settings" tab and click "Start Organization"</li>'
+            '</ol>'
+            '<p><b>💡 Tip:</b> FileFlow will create SFW/NSFW subfolders automatically!</p>'
+        )
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle('FileFlow Quick Setup Guide')
+        msg.setTextFormat(Qt.RichText)
+        msg.setText(guide_text)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+    
+    def open_folder_in_manager(self, item):
+        """Open the selected folder in the system file manager."""
+        # Extract folder path from item text (remove status indicators)
+        text = item.text()
+        if ': ' in text:
+            # Destination format: "✅ Category: /path/to/folder"
+            folder_path = text.split(': ', 1)[1]
+        else:
+            # Source format: "✅ /path/to/folder"
+            folder_path = text[2:].strip()  # Remove status emoji
+        
+        try:
+            if os.path.exists(folder_path):
+                # Open folder in system file manager
+                if os.name == 'nt':  # Windows
+                    os.startfile(folder_path)
+                elif os.name == 'posix':  # Linux/macOS
+                    subprocess.run(['xdg-open', folder_path], check=True)
+                self.statusbar.showMessage(f'Opened folder: {folder_path}', 3000)
+            else:
+                QMessageBox.warning(self, 'Folder Not Found', 
+                                   f'The folder does not exist:\n{folder_path}')
+        except Exception as e:
+            QMessageBox.warning(self, 'Error Opening Folder', 
+                               f'Could not open folder:\n{folder_path}\n\nError: {str(e)}')
+    
+    def validate_and_refresh_folders(self):
+        """Validate all configured folders and refresh the display with status indicators."""
+        try:
+            config = load_config()
+            
+            # Validate and refresh source directories
+            self.source_list.clear()
+            valid_sources = 0
+            total_sources = len(config.get('source_directories', []))
+            
+            for src in config.get('source_directories', []):
+                item = QListWidgetItem()
+                if Path(src).exists():
+                    item.setText(f'\u2705 {src}')
+                    item.setToolTip(f'Valid source directory: {src}')
+                    valid_sources += 1
+                else:
+                    item.setText(f'\u274c {src}')
+                    item.setToolTip(f'Directory not found: {src}')
+                    item.setBackground(QColor(255, 240, 240))  # Light red background
+                self.source_list.addItem(item)
+            
+            # Validate and refresh destination directories
+            self.dest_list.clear()
+            valid_destinations = 0
+            total_destinations = len(config.get('destination_directories', {}))
+            
+            for cat, dst in config.get('destination_directories', {}).items():
+                item = QListWidgetItem()
+                if Path(dst).exists():
+                    item.setText(f'\u2705 {cat}: {dst}')
+                    item.setToolTip(f'Valid destination: {cat} \u2192 {dst}')
+                    valid_destinations += 1
+                else:
+                    item.setText(f'\u274c {cat}: {dst}')
+                    item.setToolTip(f'Directory not found: {cat} \u2192 {dst}')
+                    item.setBackground(QColor(255, 240, 240))  # Light red background
+                self.dest_list.addItem(item)
+            
+            # Show validation results
+            if valid_sources == total_sources and valid_destinations == total_destinations:
+                self.statusbar.showMessage(
+                    f'\u2705 All folders validated successfully! {total_sources} sources, {total_destinations} destinations', 
+                    5000
+                )
+            else:
+                invalid_count = (total_sources - valid_sources) + (total_destinations - valid_destinations)
+                self.statusbar.showMessage(
+                    f'\u26a0\ufe0f Validation complete: {invalid_count} invalid folder(s) found. Check red-highlighted entries.', 
+                    5000
+                )
+                
+                # Show detailed validation dialog
+                if invalid_count > 0:
+                    msg = QMessageBox(self)
+                    msg.setWindowTitle('Folder Validation Results')
+                    msg.setIcon(QMessageBox.Warning)
+                    msg.setText(
+                        f'Found {invalid_count} invalid folder(s):\n\n'
+                        f'Sources: {valid_sources}/{total_sources} valid\n'
+                        f'Destinations: {valid_destinations}/{total_destinations} valid\n\n'
+                        'Invalid folders are highlighted in red. Please update or remove them.'
+                    )
+                    msg.setStandardButtons(QMessageBox.Ok)
+                    msg.exec_()
+                    
+        except Exception as e:
+            QMessageBox.critical(self, 'Validation Error', 
+                               f'Error during folder validation:\n{str(e)}')
+            self.statusbar.showMessage('Folder validation failed', 3000)
 
     def organize_with_feedback(self):
         # Progress dialog for file organization
