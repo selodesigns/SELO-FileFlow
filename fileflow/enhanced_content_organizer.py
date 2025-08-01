@@ -379,14 +379,16 @@ def organize_files(sources=None, dest=None):
     organizer = EnhancedContentOrganizer()
     if sources is not None or dest is not None:
         # Patch config for this run
-        config = organizer.get_enhanced_config()
+        config = organizer.get_enhanced_config() if organizer.config else {}
         if sources is not None:
             config['source_directories'] = sources
         if dest is not None:
-            # Send all categories to this dest for this ad-hoc run
+            # Set both destination_directories and dest for compatibility with all checks
             config['destination_directories'] = {k: dest for k in config.get('destination_directories', {}).keys()}
+            config['dest'] = dest
         organizer.config = config
     organizer.organize_files()
+
 
 
 def reorganize_existing_files(target_dirs: List[str] = None):
