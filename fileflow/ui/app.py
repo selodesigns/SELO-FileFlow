@@ -69,11 +69,17 @@ class FileFlowMainWindow(QMainWindow):
         tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         print('init_ui: QTabWidget created')
         # Folders Tab - Enhanced with descriptions
+        from PyQt5.QtWidgets import QScrollArea
         folders_tab = QWidget()
-        folders_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        folders_layout = QVBoxLayout()
-        folders_layout.setSpacing(10)  # Add consistent spacing
-        folders_layout.setContentsMargins(10, 10, 10, 10)  # Add margins for better appearance
+        folders_layout = QVBoxLayout(folders_tab)
+        folders_layout.setSpacing(10)
+        folders_layout.setContentsMargins(10, 10, 10, 10)
+
+        # We'll build all content into a container widget for the scroll area
+        folders_content = QWidget()
+        folders_content_layout = QVBoxLayout(folders_content)
+        folders_content_layout.setSpacing(10)
+        folders_content_layout.setContentsMargins(0, 0, 0, 0)
         
         # Add enhanced main description with status
         main_desc = QLabel(
@@ -109,13 +115,12 @@ class FileFlowMainWindow(QMainWindow):
         
         status_layout.addStretch()
         status_frame.setLayout(status_layout)
-        folders_layout.addWidget(status_frame)
+        folders_content_layout.addWidget(status_frame)
         
         # Source Directories Section
         source_group = QGroupBox('📥 Source Directories')
         source_group.setToolTip('Folders that FileFlow will monitor and organize files from')
-        source_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        source_group.setMinimumHeight(200)  # Ensure minimum height for visibility
+        source_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         source_layout = QVBoxLayout()
         source_layout.setSpacing(8)
         
@@ -134,6 +139,7 @@ class FileFlowMainWindow(QMainWindow):
         self.source_list = QListWidget()
         self.source_list.setToolTip('List of folders FileFlow monitors for new files to organize\nDouble-click to open folder in file manager')
         self.source_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.source_list.setMinimumHeight(80)
         self.source_list.setAlternatingRowColors(True)
         self.source_list.itemDoubleClicked.connect(self.open_folder_in_manager)
         
@@ -182,13 +188,12 @@ class FileFlowMainWindow(QMainWindow):
         source_btn_layout.addWidget(btn_validate_sources)
         source_layout.addLayout(source_btn_layout)
         source_group.setLayout(source_layout)
-        folders_layout.addWidget(source_group, 1)  # Add stretch factor
+        folders_content_layout.addWidget(source_group)
         
         # Destination Directories Section
         dest_group = QGroupBox('📤 Destination Directories')
         dest_group.setToolTip('Organized folders where FileFlow will move sorted files')
-        dest_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        dest_group.setMinimumHeight(200)  # Ensure minimum height for visibility
+        dest_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         dest_layout = QVBoxLayout()
         dest_layout.setSpacing(8)
         
@@ -207,6 +212,7 @@ class FileFlowMainWindow(QMainWindow):
         self.dest_list = QListWidget()
         self.dest_list.setToolTip('List of organized destination folders for each file category\nDouble-click to open folder in file manager')
         self.dest_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.dest_list.setMinimumHeight(80)
         self.dest_list.setAlternatingRowColors(True)
         self.dest_list.itemDoubleClicked.connect(self.open_folder_in_manager)
         
@@ -246,12 +252,11 @@ class FileFlowMainWindow(QMainWindow):
         dest_btn_layout.addWidget(btn_remove_dest)
         dest_layout.addLayout(dest_btn_layout)
         dest_group.setLayout(dest_layout)
-        folders_layout.addWidget(dest_group, 1)  # Add stretch factor
+        folders_content_layout.addWidget(dest_group)
         
         # Advanced Configuration Section
         config_group = QGroupBox('⚙️ Advanced Configuration')
-        config_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        config_group.setMinimumHeight(100)  # Smaller minimum height for config section
+        config_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         config_layout = QVBoxLayout()
         config_layout.setSpacing(8)
         
@@ -270,11 +275,14 @@ class FileFlowMainWindow(QMainWindow):
         btn_open_config.setMinimumHeight(30)
         config_layout.addWidget(btn_open_config)
         config_group.setLayout(config_layout)
-        folders_layout.addWidget(config_group)
-        
-        # Add stretch at the end to push content to top
-        folders_layout.addStretch()
-        
+        folders_content_layout.addWidget(config_group)
+        folders_content_layout.addStretch()
+
+        # --- Add content widget to scroll area ---
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(folders_content)
+        folders_layout.addWidget(scroll)
         folders_tab.setLayout(folders_layout)
         tabs.addTab(folders_tab, '📁 Folders')
         print('init_ui: Folders tab added')
