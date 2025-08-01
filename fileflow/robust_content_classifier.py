@@ -700,38 +700,53 @@ class RobustContentClassifier:
         
         return result
 
-def classify_media_file(self, file_path: Path) -> Dict:
-    """
-    Classify a media file using a two-pass system:
-    1. First pass: Quick filename analysis
-    2. Second pass: Content analysis for all files
-    """
-    # Check cache first
-    cached_result = self.get_cached_result(file_path)
-    if cached_result:
-        return cached_result
+    def should_classify_file(self, file_path: Path) -> bool:
+        """Check if a file should be content-classified.
         
-    # First pass: Filename analysis
-    filename_analysis = self.analyze_filename_only(file_path)
-    
-    # If filename analysis is very confident, we can skip content analysis for SFW
-    if (not filename_analysis['is_potentially_nsfw'] and 
-        filename_analysis['confidence'] >= 0.9 and
-        not filename_analysis['requires_content_analysis']):
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            bool: True if the file should be classified, False otherwise
+        """
+        extension = file_path.suffix.lower()
+        supported_extensions = {
+            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff',  # Images
+            '.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'  # Videos
+        }
+        return extension in supported_extensions
         
+    def classify_media_file(self, file_path: Path) -> Dict:
+        """
+        Classify a media file using a two-pass system:
+        1. First pass: Quick filename analysis
+        2. Second pass: Content analysis for all files
+        """
+        # Check cache first
+        cached_result = self.get_cached_result(file_path)
+        if cached_result:
+            return cached_result
+            
+        # Initialize result with default values
         result = {
             'file_path': str(file_path),
-            'file_type': 'other' if file_path.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'} 
-                        else 'image' if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff'} else 'video',
+            'file_type': 'other',
             'is_nsfw': False,
-            'confidence': filename_analysis['confidence'],
+            'confidence': 0.5,  # Default confidence level
             'nsfw_score': 0.0,
-            'analysis_methods': ['filename_analysis'],
-            'details': {
-                'filename_analysis': filename_analysis,
-                'reason': 'High confidence SFW from filename analysis'
-            }
+            'analysis_methods': [],
+            'details': {}
         }
+        
+        # First pass: Filename analysis
+        filename_analysis = self.analyze_filename_only(file_path)
+        result['details']['filename_analysis'] = filename_analysis
+        result['analysis_methods'].append('filename_analysis')
+        
+        # Check file extension to determine type
+        extension = file_path.suffix.lower()
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff'}
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'}
         
         if extension in image_extensions:
             result['file_type'] = 'image'
@@ -742,11 +757,33 @@ def classify_media_file(self, file_path: Path) -> Dict:
             result['is_nsfw'] = False  # Explicitly mark non-media as SFW
             result['confidence'] = 1.0
             result['analysis_methods'] = ['non_media']
+            self.save_cached_result(file_path, result)
             return result  # Return SFW for non-media files
             
-        # 1. First, analyze the filename and path for NSFW indicators
+        # If filename analysis is very confident, we can skip content analysis for SFW
+        if (not filename_analysis.get('is_potentially_nsfw', False) and 
+            filename_analysis.get('confidence', 0) >= 0.9 and
+            not filename_analysis.get('requires_content_analysis', True)):
+            
+            result.update({
+                'is_nsfw': False,
+                'confidence': filename_analysis.get('confidence', 0.9),
+                'nsfw_score': 0.0,
+                'details': {
+                    **result['details'],
+                    'reason': 'High confidence SFW from filename analysis'
+                }
+            })
+            self.save_cached_result(file_path, result)
+            return result
+            
+        # Perform full filename analysis
         filename_analysis = self.analyze_filename(file_path)
         result['details']['filename_analysis'] = filename_analysis
+        
+        # If we already have a cached result from analyze_filename_only, don't overwrite it
+        if 'filename_analysis' not in result['analysis_methods']:
+            result['analysis_methods'].append('filename_analysis')
         
         # 2. If filename is explicitly NSFW, return immediately with high confidence
         if filename_analysis.get('is_explicit', False):
@@ -777,6 +814,7 @@ def classify_media_file(self, file_path: Path) -> Dict:
                 visual_score = opencv_analysis.get('visual_score', 0)
                 
                 # If filename is explicit, require less visual evidence
+                is_explicit_filename = filename_analysis.get('is_explicit', False)
                 if is_explicit_filename:
                     if skin_percentage > 40 or visual_score > 0.6:
                         result['is_nsfw'] = True
@@ -819,6 +857,7 @@ def classify_media_file(self, file_path: Path) -> Dict:
                 nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
                 
                 # If filename is explicit, require less visual evidence
+                is_explicit_filename = filename_analysis.get('is_explicit', False)
                 if is_explicit_filename:
                     if nsfw_frames or nsfw_confidence > 0.5:
                         result['is_nsfw'] = True
@@ -857,90 +896,118 @@ def classify_media_file(self, file_path: Path) -> Dict:
             result['nsfw_score'] = 0.0
             result['details']['reason'] = 'Non-media file - treated as SFW'
         
-        # Cache and return
-        self.save_cached_result(file_path, result)
-        return result
-        
         # 2. File properties analysis
-        properties_analysis = self.analyze_file_properties(file_path)
-        result['details']['properties'] = properties_analysis
-        result['analysis_methods'].append('properties')
-        
-        # Adjust score based on file properties
-        if properties_analysis.get('suspicious_size', False):
-            result['nsfw_score'] += properties_analysis.get('size_score', 0)
+        try:
+            properties_analysis = self.analyze_file_properties(file_path)
+            if properties_analysis:
+                result['details']['properties'] = properties_analysis
+                result['analysis_methods'].append('properties')
+                
+                # Adjust score based on file properties
+                if properties_analysis.get('suspicious_size', False):
+                    result['nsfw_score'] += properties_analysis.get('size_score', 0)
+        except Exception as e:
+            result['details']['properties_error'] = str(e)
         
         # 3. Content-specific analysis
-        if result['file_type'] == 'image':
-            # Try Pillow analysis first (lightweight)
-            pillow_analysis = self.analyze_image_with_pillow(file_path)
-            if 'error' not in pillow_analysis:
-                result['details']['pillow'] = pillow_analysis
-                result['analysis_methods'].append('pillow')
+        try:
+            if result['file_type'] == 'image':
+                # Try Pillow analysis first (lightweight)
+                if self.has_pillow:
+                    pillow_analysis = self.analyze_image_with_pillow(file_path)
+                    if 'error' not in pillow_analysis and pillow_analysis is not None:
+                        result['details']['pillow'] = pillow_analysis
+                        result['analysis_methods'].append('pillow')
+                        
+                        # Adjust score based on image properties
+                        suspicion_score = pillow_analysis.get('suspicion_score', 0)
+                        result['nsfw_score'] = max(result['nsfw_score'], suspicion_score)
                 
-                # Adjust score based on image properties
-                suspicion_score = pillow_analysis.get('suspicion_score', 0)
-                result['nsfw_score'] += suspicion_score
+                # Try OpenCV analysis if available (advanced)
+                if self.has_opencv:
+                    opencv_analysis = self.analyze_image_with_opencv(file_path)
+                    if 'error' not in opencv_analysis and opencv_analysis is not None:
+                        result['details']['opencv'] = opencv_analysis
+                        result['analysis_methods'].append('opencv')
+                        
+                        # Use visual analysis to override or confirm filename analysis
+                        visual_score = opencv_analysis.get('visual_score', 0)
+                        skin_percentage = opencv_analysis.get('skin_percentage', 0)
+                        
+                        # Update NSFW score based on visual analysis
+                        if skin_percentage > 0 or visual_score > 0:
+                            # Weight visual analysis more heavily than other factors
+                            result['nsfw_score'] = max(result['nsfw_score'], visual_score * 1.5)
+                            
+                            # Require BOTH high skin percentage and high visual score for NSFW
+                            if skin_percentage > 60 and visual_score > 0.6:
+                                result['is_nsfw'] = True
+                                result['confidence'] = max(result['confidence'], 0.9)
+                                result['details']['reason'] = 'Visual analysis indicates NSFW content'
+                            # If visual analysis strongly suggests SFW
+                            elif visual_score < 0.2 and skin_percentage < 10:
+                                result['is_nsfw'] = False
+                                result['confidence'] = max(result['confidence'], 0.8)
+                                result['details']['reason'] = 'Visual analysis confirms SFW content'
             
-            # Try OpenCV analysis if available (advanced)
-            opencv_analysis = self.analyze_image_with_opencv(file_path)
-            if 'error' not in opencv_analysis:
-                result['details']['opencv'] = opencv_analysis
-                result['analysis_methods'].append('opencv')
+            elif result['file_type'] == 'video':
+                # First check video metadata
+                video_analysis = self.analyze_video_metadata(file_path)
+                if 'error' not in video_analysis and video_analysis is not None:
+                    result['details']['video_metadata'] = video_analysis
+                    result['analysis_methods'].append('video_metadata')
+                    
+                    # Adjust score based on video properties
+                    suspicion_score = video_analysis.get('suspicion_score', 0)
+                    result['nsfw_score'] = max(result['nsfw_score'], suspicion_score)
                 
-                # Use visual analysis to override or confirm filename analysis
-                visual_score = opencv_analysis.get('visual_score', 0)
-                skin_percentage = opencv_analysis.get('skin_percentage', 0)
-
-                # Revised: Require BOTH high skin percentage and high visual score for NSFW
-                # Only mark NSFW if skin_percentage > 60 and visual_score > 0.6
-                if skin_percentage > 60 and visual_score > 0.6:
-                    result['is_nsfw'] = True
-                    result['confidence'] = max(result['confidence'], 0.9)
-                    result['nsfw_score'] = max(result['nsfw_score'], visual_score)
-                # If visual analysis strongly suggests SFW and filename was uncertain
-                elif visual_score < 0.2 and skin_percentage < 10 and result['confidence'] < 0.7:
-                    result['is_nsfw'] = False
-                    result['confidence'] = 0.7
-                    result['nsfw_score'] = min(result['nsfw_score'], visual_score)
-                # Otherwise, do not override filename-based or other analysis
-                # (prevents false positives for normal photos with some skin tones)
+                # If OpenCV is available, analyze video frames
+                if self.has_opencv:
+                    frame_analysis = self.analyze_video_frames(file_path, sample_count=3)
+                    if frame_analysis:
+                        result['details']['frame_analysis'] = frame_analysis
+                        result['analysis_methods'].append('frame_analysis')
+                        
+                        # Check if any sampled frame indicates NSFW content
+                        nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
+                        nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
+                        
+                        if nsfw_frames and nsfw_confidence > 0.7:
+                            result['is_nsfw'] = True
+                            result['confidence'] = max(result['confidence'], nsfw_confidence)
+                            result['nsfw_score'] = max(result['nsfw_score'], nsfw_confidence)
+                            result['details']['reason'] = f'NSFW content detected in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
         
-        elif result['file_type'] == 'video':
-            video_analysis = self.analyze_video_metadata(file_path)
-            if 'error' not in video_analysis:
-                result['details']['video'] = video_analysis
-                result['analysis_methods'].append('video_metadata')
-                
-                # Adjust score based on video properties
-                suspicion_score = video_analysis.get('suspicion_score', 0)
-                result['nsfw_score'] += suspicion_score
+        except Exception as e:
+            result['details']['analysis_error'] = str(e)
         
-        # Final classification based on combined score
-        result['nsfw_score'] = min(result['nsfw_score'], 1.0)
+        # Final classification based on combined score and analysis
+        result['nsfw_score'] = min(max(result['nsfw_score'], 0.0), 1.0)  # Clamp between 0 and 1
         
-        # If no strong filename indicators, use combined analysis
-        if filename_analysis['method'] == 'filename_neutral':
+        # If we have explicit filename indicators, they take precedence
+        if filename_analysis.get('is_explicit', False):
+            result['is_nsfw'] = True
+            result['confidence'] = max(result['confidence'], 0.95)
+            result['nsfw_score'] = max(result['nsfw_score'], 0.9)
+            result['details']['reason'] = 'Explicit filename detected'
+        elif filename_analysis.get('is_sfw', False):
+            # Only trust SFW markers if we don't have strong NSFW evidence
+            if result['nsfw_score'] < 0.7:
+                result['is_nsfw'] = False
+                result['confidence'] = max(result['confidence'], 0.9)
+                result['nsfw_score'] = min(result['nsfw_score'], 0.3)
+                result['details']['reason'] = 'Explicit SFW markers in filename'
+        # If we have no strong indicators either way, use the calculated score
+        elif 'filename_neutral' in filename_analysis.get('method', '') or not result['analysis_methods']:
             result['is_nsfw'] = result['nsfw_score'] > 0.6
-            result['confidence'] = min(result['nsfw_score'] * 1.2, 1.0)
+            result['confidence'] = min(max(result['confidence'], result['nsfw_score'] * 1.2), 1.0)
+            if 'reason' not in result['details']:
+                result['details']['reason'] = 'Content analysis completed'
         
-        # Cache the result
+        # Cache and return the result
         self.save_cached_result(file_path, result)
-        
         return result
-    
-    def should_classify_file(self, file_path: Path) -> bool:
-        """Check if a file should be content-classified.
-        
-        Args:
-            file_path: Path to the file to check
-            
-        Returns:
-            bool: True if the file should be classified, False otherwise
-        """
-        extension = file_path.suffix.lower()
-        supported_extensions = {
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff',  # Images
-            '.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'  # Videos
-        }
-        return extension in supported_extensions
+
+
+
+# This line should be the end of the file
