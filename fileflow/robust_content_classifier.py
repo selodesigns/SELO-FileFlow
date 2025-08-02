@@ -67,6 +67,7 @@ class RobustContentClassifier:
         self.has_pillow = self._check_pillow()
         self.has_opencv = self._check_opencv()
         self.has_exiftool = self._check_exiftool()
+        self.has_ffmpeg = self._check_ffmpeg()
         
         # Initialize enhanced EXIF analyzer
         self.exif_analyzer = EnhancedExifAnalyzer()
@@ -97,6 +98,15 @@ class RobustContentClassifier:
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             logger.debug("exiftool not available - advanced metadata analysis disabled")
+            return False
+    
+    def _check_ffmpeg(self) -> bool:
+        """Check if ffmpeg/ffprobe is available for video analysis."""
+        try:
+            subprocess.run(['ffprobe', '-version'], capture_output=True, check=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.debug("ffmpeg/ffprobe not available - video frame analysis disabled")
             return False
     
     def get_file_hash(self, file_path: Path) -> str:
