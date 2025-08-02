@@ -998,8 +998,9 @@ class RobustContentClassifier:
                             result['confidence'] = max(result['confidence'], nsfw_confidence)
                             result['nsfw_score'] = max(result['nsfw_score'], nsfw_confidence)
                             result['details']['reason'] = f'NSFW content detected in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
-        
         except Exception as e:
+            result['details']['analysis_error'] = str(e)
+            print(f"Error occurred during analysis: {e}")
 
         # Nuanced combination of filename and content analysis
         if filename_analysis.get('is_explicit', False):
