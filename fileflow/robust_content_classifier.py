@@ -35,7 +35,7 @@ class RobustContentClassifier:
                 'bbc', 'interracial', 'creampie', 'orgy', 'gangbang', 'threesome',
                 'cum', 'cumshot', 'facial', 'deepthroat', 'hardcore', 'softcore', 'amateur',
                 'blacked', 'pawg', 'casting', 'taboo', 'incest', 'cuckold', 'swinger', 'dp',
-                'double penetration', 'spitroast', 'gape', 'slut', 'whore', 'escort'
+                'double penetration', 'spitroast', 'gape', 'slut', 'whore', 'escort', 'bull'
             ],
             'body_parts': [
                 'boobs', 'tits', 'ass', 'booty', 'dick', 'cock', 'pussy', 'vagina', 'penis',
