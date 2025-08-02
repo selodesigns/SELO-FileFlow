@@ -811,19 +811,23 @@ class RobustContentClassifier:
                     skin_percentage = opencv_analysis.get('skin_percentage', 0)
                     visual_score = opencv_analysis.get('visual_score', 0)
                     
-                    # Calculate content NSFW score based on visual analysis
-                    if skin_percentage > 60 and visual_score > 0.6:
+                    # Calculate content NSFW score based on visual analysis (LESS AGGRESSIVE THRESHOLDS)
+                    if skin_percentage > 75 and visual_score > 0.8:
                         content_nsfw_score = 0.9
+                        content_confidence = 0.9
+                        content_reason = f'Very high skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                    elif skin_percentage > 65 and visual_score > 0.7:
+                        content_nsfw_score = 0.7
                         content_confidence = 0.8
                         content_reason = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
-                    elif skin_percentage > 40 or visual_score > 0.5:
-                        content_nsfw_score = 0.7
+                    elif skin_percentage > 50 and visual_score > 0.6:
+                        content_nsfw_score = 0.5
                         content_confidence = 0.6
-                        content_reason = f'Moderate skin content ({skin_percentage:.1f}%) or visual indicators'
+                        content_reason = f'Moderate skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
                     else:
-                        content_nsfw_score = 0.2
-                        content_confidence = 0.7
-                        content_reason = f'Low skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                        content_nsfw_score = 0.1
+                        content_confidence = 0.8
+                        content_reason = f'Low skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f}) - likely SFW'
                         
                     # Also analyze with Pillow for basic properties
                     pillow_analysis = self.analyze_image_with_pillow(file_path)
@@ -856,35 +860,48 @@ class RobustContentClassifier:
                 result['details']['video'] = video_analysis
                 result['analysis_methods'].append('video_metadata')
                 
-                # Sample frames for visual analysis
-                frame_analysis = self.analyze_video_frames(file_path, sample_count=5)
-                if frame_analysis:
-                    result['details']['frame_analysis'] = frame_analysis
-                    result['analysis_methods'].append('frame_analysis')
-                    
-                    # Check if any sampled frame indicates NSFW content
-                    nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
-                    nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
-                    
-                    # Calculate content NSFW score based on video frame analysis
-                    if nsfw_frames and nsfw_confidence > 0.7:
-                        content_nsfw_score = nsfw_confidence
-                        content_confidence = 0.8
-                        content_reason = f'NSFW content detected in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
-                    elif nsfw_confidence > 0.5:
-                        content_nsfw_score = nsfw_confidence
-                        content_confidence = 0.6
-                        content_reason = f'Moderate NSFW indicators in video frames (confidence: {nsfw_confidence:.2f})'
+                # Sample frames for visual analysis (with better error handling)
+                try:
+                    if self.has_ffmpeg:
+                        frame_analysis = self.analyze_video_frames(file_path, sample_count=3)
+                        if frame_analysis and len(frame_analysis) > 0:
+                            result['details']['frame_analysis'] = frame_analysis
+                            result['analysis_methods'].append('frame_analysis')
+                            
+                            # Check if any sampled frame indicates NSFW content
+                            nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
+                            nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
+                            
+                            # Calculate content NSFW score based on video frame analysis (LESS AGGRESSIVE)
+                            if nsfw_frames and nsfw_confidence > 0.8:
+                                content_nsfw_score = nsfw_confidence
+                                content_confidence = 0.8
+                                content_reason = f'Strong NSFW content in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
+                            elif nsfw_confidence > 0.6:
+                                content_nsfw_score = nsfw_confidence * 0.7  # Reduce confidence
+                                content_confidence = 0.6
+                                content_reason = f'Moderate NSFW indicators in video frames (confidence: {nsfw_confidence:.2f})'
+                            else:
+                                content_nsfw_score = 0.1
+                                content_confidence = 0.7
+                                content_reason = f'No significant NSFW content in sampled frames - likely SFW'
+                        else:
+                            # Frame analysis failed but ffmpeg available - use metadata
+                            suspicion_score = video_analysis.get('suspicion_score', 0)
+                            content_nsfw_score = min(suspicion_score, 0.4)  # Cap metadata-only scores
+                            content_confidence = 0.5
+                            content_reason = 'Frame analysis failed, using video metadata only'
                     else:
-                        content_nsfw_score = 0.2
-                        content_confidence = 0.7
-                        content_reason = f'No significant NSFW content in sampled frames'
-                else:
-                    # Fallback to metadata analysis if frame analysis fails
-                    suspicion_score = video_analysis.get('suspicion_score', 0)
-                    content_nsfw_score = suspicion_score
-                    content_confidence = 0.5
-                    content_reason = 'Using video metadata analysis only'
+                        # No ffmpeg - use metadata analysis only
+                        suspicion_score = video_analysis.get('suspicion_score', 0)
+                        content_nsfw_score = min(suspicion_score, 0.3)  # Lower cap without ffmpeg
+                        content_confidence = 0.4
+                        content_reason = 'No ffmpeg available, using video metadata only'
+                except Exception as e:
+                    # Video analysis completely failed - default to SFW with low confidence
+                    content_nsfw_score = 0.1
+                    content_confidence = 0.3
+                    content_reason = f'Video analysis failed: {str(e)} - defaulting to SFW'
         
         except Exception as e:
             result['details']['analysis_error'] = str(e)
