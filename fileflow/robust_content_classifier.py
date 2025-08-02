@@ -802,32 +802,43 @@ class RobustContentClassifier:
         try:
             # CONTENT ANALYSIS FOR IMAGES
             if result['file_type'] == 'image':
-                # Analyze image with OpenCV
-                opencv_analysis = self.analyze_image_with_opencv(file_path)
-                if 'error' not in opencv_analysis:
-                    result['details']['opencv'] = opencv_analysis
-                    result['analysis_methods'].append('opencv')
-                    
-                    skin_percentage = opencv_analysis.get('skin_percentage', 0)
-                    visual_score = opencv_analysis.get('visual_score', 0)
-                    
-                    # Calculate content NSFW score based on visual analysis (LESS AGGRESSIVE THRESHOLDS)
-                    if skin_percentage > 75 and visual_score > 0.8:
-                        content_nsfw_score = 0.9
-                        content_confidence = 0.9
-                        content_reason = f'Very high skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
-                    elif skin_percentage > 65 and visual_score > 0.7:
-                        content_nsfw_score = 0.7
-                        content_confidence = 0.8
-                        content_reason = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
-                    elif skin_percentage > 50 and visual_score > 0.6:
-                        content_nsfw_score = 0.5
-                        content_confidence = 0.6
-                        content_reason = f'Moderate skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                try:
+                    # Analyze image with OpenCV
+                    opencv_analysis = self.analyze_image_with_opencv(file_path)
+                    if opencv_analysis and 'error' not in opencv_analysis:
+                        result['details']['opencv'] = opencv_analysis
+                        result['analysis_methods'].append('opencv')
+                        
+                        skin_percentage = opencv_analysis.get('skin_percentage', 0)
+                        visual_score = opencv_analysis.get('visual_score', 0)
+                        
+                        # Calculate content NSFW score based on visual analysis (LESS AGGRESSIVE THRESHOLDS)
+                        if skin_percentage > 75 and visual_score > 0.8:
+                            content_nsfw_score = 0.9
+                            content_confidence = 0.9
+                            content_reason = f'Very high skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                        elif skin_percentage > 65 and visual_score > 0.7:
+                            content_nsfw_score = 0.7
+                            content_confidence = 0.8
+                            content_reason = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                        elif skin_percentage > 50 and visual_score > 0.6:
+                            content_nsfw_score = 0.5
+                            content_confidence = 0.6
+                            content_reason = f'Moderate skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                        else:
+                            content_nsfw_score = 0.1
+                            content_confidence = 0.8
+                            content_reason = f'Low skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f}) - likely SFW'
                     else:
-                        content_nsfw_score = 0.1
-                        content_confidence = 0.8
-                        content_reason = f'Low skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f}) - likely SFW'
+                        # OpenCV analysis failed - set default SFW values
+                        content_nsfw_score = 0.2
+                        content_confidence = 0.5
+                        content_reason = 'OpenCV analysis failed - defaulting to likely SFW'
+                except Exception as e:
+                    # Image analysis completely failed - default to SFW
+                    content_nsfw_score = 0.2
+                    content_confidence = 0.4
+                    content_reason = f'Image analysis failed: {str(e)} - defaulting to likely SFW'
                         
                     # Also analyze with Pillow for basic properties
                     pillow_analysis = self.analyze_image_with_pillow(file_path)
@@ -863,50 +874,59 @@ class RobustContentClassifier:
                 # Sample frames for visual analysis (with better error handling)
                 try:
                     if self.has_ffmpeg:
-                        frame_analysis = self.analyze_video_frames(file_path, sample_count=3)
-                        if frame_analysis and len(frame_analysis) > 0:
-                            result['details']['frame_analysis'] = frame_analysis
-                            result['analysis_methods'].append('frame_analysis')
-                            
-                            # Check if any sampled frame indicates NSFW content
-                            nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
-                            nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
-                            
-                            # Calculate content NSFW score based on video frame analysis (LESS AGGRESSIVE)
-                            if nsfw_frames and nsfw_confidence > 0.8:
-                                content_nsfw_score = nsfw_confidence
-                                content_confidence = 0.8
-                                content_reason = f'Strong NSFW content in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
-                            elif nsfw_confidence > 0.6:
-                                content_nsfw_score = nsfw_confidence * 0.7  # Reduce confidence
-                                content_confidence = 0.6
-                                content_reason = f'Moderate NSFW indicators in video frames (confidence: {nsfw_confidence:.2f})'
+                        try:
+                            frame_analysis = self.analyze_video_frames(file_path, sample_count=3)
+                            if frame_analysis and len(frame_analysis) > 0:
+                                result['details']['frame_analysis'] = frame_analysis
+                                result['analysis_methods'].append('frame_analysis')
+                                
+                                # Check if any sampled frame indicates NSFW content
+                                nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
+                                nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
+                                
+                                # Calculate content NSFW score based on video frame analysis (LESS AGGRESSIVE)
+                                if nsfw_frames and nsfw_confidence > 0.8:
+                                    content_nsfw_score = nsfw_confidence
+                                    content_confidence = 0.8
+                                    content_reason = f'Strong NSFW content in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
+                                elif nsfw_confidence > 0.6:
+                                    content_nsfw_score = nsfw_confidence * 0.7  # Reduce confidence
+                                    content_confidence = 0.6
+                                    content_reason = f'Moderate NSFW indicators in video frames (confidence: {nsfw_confidence:.2f})'
+                                else:
+                                    content_nsfw_score = 0.1
+                                    content_confidence = 0.7
+                                    content_reason = f'No significant NSFW content in sampled frames - likely SFW'
                             else:
-                                content_nsfw_score = 0.1
-                                content_confidence = 0.7
-                                content_reason = f'No significant NSFW content in sampled frames - likely SFW'
-                        else:
-                            # Frame analysis failed but ffmpeg available - use metadata
+                                # Frame analysis failed but ffmpeg available - use metadata
+                                suspicion_score = video_analysis.get('suspicion_score', 0)
+                                content_nsfw_score = min(suspicion_score, 0.4)  # Cap metadata-only scores
+                                content_confidence = 0.5
+                                content_reason = 'Frame analysis failed, using video metadata only'
+                        except Exception as e:
+                            # Frame analysis failed - use metadata fallback
                             suspicion_score = video_analysis.get('suspicion_score', 0)
-                            content_nsfw_score = min(suspicion_score, 0.4)  # Cap metadata-only scores
-                            content_confidence = 0.5
-                            content_reason = 'Frame analysis failed, using video metadata only'
+                            content_nsfw_score = min(suspicion_score, 0.3)
+                            content_confidence = 0.4
+                            content_reason = f'Frame analysis failed ({str(e)}), using metadata only'
                     else:
                         # No ffmpeg - use metadata analysis only
                         suspicion_score = video_analysis.get('suspicion_score', 0)
                         content_nsfw_score = min(suspicion_score, 0.3)  # Lower cap without ffmpeg
-                        content_confidence = 0.4
+                        content_confidence = 0.5
                         content_reason = 'No ffmpeg available, using video metadata only'
                 except Exception as e:
-                    # Video analysis completely failed - default to SFW with low confidence
+                    # Video analysis completely failed - default to SFW
                     content_nsfw_score = 0.1
-                    content_confidence = 0.3
-                    content_reason = f'Video analysis failed: {str(e)} - defaulting to SFW'
+                    content_confidence = 0.4
+                    content_reason = f'Video analysis failed: {str(e)} - defaulting to likely SFW'
         
         except Exception as e:
             result['details']['analysis_error'] = str(e)
-            content_confidence = 0.1
-            content_reason = f'Content analysis failed: {str(e)}'
+            # Ensure content analysis variables are always set even on complete failure
+            content_nsfw_score = 0.2  # Slight NSFW bias for safety when analysis fails
+            content_confidence = 0.3   # Low confidence when analysis fails
+            content_reason = f'Content analysis failed: {str(e)} - using conservative default'
         
         # Content analysis is now complete - proceed to decision logic
 
