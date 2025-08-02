@@ -1000,17 +1000,24 @@ class RobustContentClassifier:
                             result['details']['reason'] = f'NSFW content detected in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
         
         except Exception as e:
-            result['details']['analysis_error'] = str(e)
-        
-        # Final classification based on combined score and analysis
-        result['nsfw_score'] = min(max(result['nsfw_score'], 0.0), 1.0)  # Clamp between 0 and 1
-        
-        # If we have explicit filename indicators, they take precedence
+
+        # Nuanced combination of filename and content analysis
         if filename_analysis.get('is_explicit', False):
-            result['is_nsfw'] = True
-            result['confidence'] = max(result['confidence'], 0.95)
-            result['nsfw_score'] = max(result['nsfw_score'], 0.9)
-            result['details']['reason'] = 'Explicit filename detected'
+            if result['nsfw_score'] > 0.6:
+                result['is_nsfw'] = True
+                result['confidence'] = max(result['confidence'], 0.97)
+                result['nsfw_score'] = max(result['nsfw_score'], 0.9)
+                result['details']['reason'] = 'Explicit filename and content both NSFW'
+            elif result['nsfw_score'] < 0.3:
+                result['is_nsfw'] = False
+                result['confidence'] = min(result['confidence'], 0.6)
+                result['nsfw_score'] = min(result['nsfw_score'], 0.2)
+                result['details']['reason'] = 'Explicit NSFW filename but content clearly SFW'
+            else:
+                result['is_nsfw'] = True
+                result['confidence'] = 0.7
+                result['nsfw_score'] = max(result['nsfw_score'], 0.6)
+                result['details']['reason'] = 'Explicit NSFW filename, content ambiguous'
         elif filename_analysis.get('is_sfw', False):
             # Only trust SFW markers if we don't have strong NSFW evidence
             if result['nsfw_score'] < 0.7:
@@ -1018,17 +1025,19 @@ class RobustContentClassifier:
                 result['confidence'] = max(result['confidence'], 0.9)
                 result['nsfw_score'] = min(result['nsfw_score'], 0.3)
                 result['details']['reason'] = 'Explicit SFW markers in filename'
-        # If we have no strong indicators either way, use the calculated score
-        elif 'filename_neutral' in filename_analysis.get('method', '') or not result['analysis_methods']:
+            else:
+                result['is_nsfw'] = True
+                result['confidence'] = max(result['confidence'], 0.8)
+                result['details']['reason'] = 'SFW filename but content is strongly NSFW'
+        else:
+            # If we have no strong indicators either way, use the calculated score
             result['is_nsfw'] = result['nsfw_score'] > 0.6
             result['confidence'] = min(max(result['confidence'], result['nsfw_score'] * 1.2), 1.0)
             if 'reason' not in result['details']:
                 result['details']['reason'] = 'Content analysis completed'
-        
         # Cache and return the result
         self.save_cached_result(file_path, result)
         return result
-
 
 
 # This line should be the end of the file
