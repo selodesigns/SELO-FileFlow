@@ -811,24 +811,47 @@ class RobustContentClassifier:
                         
                         skin_percentage = opencv_analysis.get('skin_percentage', 0)
                         visual_score = opencv_analysis.get('visual_score', 0)
-                        
-                        # Calculate content NSFW score based on visual analysis (LESS AGGRESSIVE THRESHOLDS)
-                        if skin_percentage > 75 and visual_score > 0.8:
-                            content_nsfw_score = 0.9
-                            content_confidence = 0.9
-                            content_reason = f'Very high skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
-                        elif skin_percentage > 65 and visual_score > 0.7:
-                            content_nsfw_score = 0.7
-                            content_confidence = 0.8
-                            content_reason = f'High skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
-                        elif skin_percentage > 50 and visual_score > 0.6:
-                            content_nsfw_score = 0.5
-                            content_confidence = 0.6
-                            content_reason = f'Moderate skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f})'
+                        width = opencv_analysis.get('image_shape', (0,0,0))[1]
+                        height = opencv_analysis.get('image_shape', (0,0,0))[0]
+
+                        # Meme/cartoon detection: count unique colors
+                        import cv2
+                        import numpy as np
+                        image = cv2.imread(str(file_path))
+                        if image is not None:
+                            # Convert to RGB for unique color counting
+                            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                            # Downsample for speed if large
+                            if image_rgb.shape[1] > 400 or image_rgb.shape[0] > 400:
+                                scale = 400 / max(image_rgb.shape[0], image_rgb.shape[1])
+                                image_rgb = cv2.resize(image_rgb, (int(image_rgb.shape[1]*scale), int(image_rgb.shape[0]*scale)))
+                            flat = image_rgb.reshape(-1, 3)
+                            unique_colors = len(np.unique(flat, axis=0))
                         else:
-                            content_nsfw_score = 0.1
-                            content_confidence = 0.8
-                            content_reason = f'Low skin content ({skin_percentage:.1f}%) and visual score ({visual_score:.2f}) - likely SFW'
+                            unique_colors = 0
+
+                        # Debug info
+                        content_debug = f"skin: {skin_percentage:.1f}%, visual: {visual_score:.2f}, colors: {unique_colors}, size: {width}x{height}"
+
+                        # New tuned logic
+                        if unique_colors <= 64 or min(width, height) <= 200:
+                            # Meme/cartoon/small image: strongly bias SFW
+                            content_nsfw_score = 0.05
+                            content_confidence = 0.95
+                            content_reason = f"Likely meme/cartoon or small image ({content_debug}) - classified as SFW"
+                        elif skin_percentage > 70 and visual_score > 0.85 and unique_colors > 64 and min(width, height) > 200:
+                            content_nsfw_score = 0.95
+                            content_confidence = 0.95
+                            content_reason = f"High skin and visual score, large/photographic ({content_debug}) - classified as NSFW"
+                        elif skin_percentage < 40 or visual_score < 0.5:
+                            content_nsfw_score = 0.05
+                            content_confidence = 0.9
+                            content_reason = f"Low skin or visual score ({content_debug}) - classified as SFW"
+                        else:
+                            content_nsfw_score = 0.3
+                            content_confidence = 0.7
+                            content_reason = f"Uncertain, moderate skin/visual/size ({content_debug}) - defaulting to SFW"
+
                     else:
                         # OpenCV analysis failed - set default SFW values
                         content_nsfw_score = 0.2
