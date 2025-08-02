@@ -907,80 +907,8 @@ class RobustContentClassifier:
             result['details']['analysis_error'] = str(e)
             content_confidence = 0.1
             content_reason = f'Content analysis failed: {str(e)}'
-        except Exception as e:
-            result['details']['properties_error'] = str(e)
         
-        # 3. Content-specific analysis
-        try:
-            if result['file_type'] == 'image':
-                # Try Pillow analysis first (lightweight)
-                if self.has_pillow:
-                    pillow_analysis = self.analyze_image_with_pillow(file_path)
-                    if 'error' not in pillow_analysis and pillow_analysis is not None:
-                        result['details']['pillow'] = pillow_analysis
-                        result['analysis_methods'].append('pillow')
-                        
-                        # Adjust score based on image properties
-                        suspicion_score = pillow_analysis.get('suspicion_score', 0)
-                        result['nsfw_score'] = max(result['nsfw_score'], suspicion_score)
-                
-                # Try OpenCV analysis if available (advanced)
-                if self.has_opencv:
-                    opencv_analysis = self.analyze_image_with_opencv(file_path)
-                    if 'error' not in opencv_analysis and opencv_analysis is not None:
-                        result['details']['opencv'] = opencv_analysis
-                        result['analysis_methods'].append('opencv')
-                        
-                        # Use visual analysis to override or confirm filename analysis
-                        visual_score = opencv_analysis.get('visual_score', 0)
-                        skin_percentage = opencv_analysis.get('skin_percentage', 0)
-                        
-                        # Update NSFW score based on visual analysis
-                        if skin_percentage > 0 or visual_score > 0:
-                            # Weight visual analysis more heavily than other factors
-                            result['nsfw_score'] = max(result['nsfw_score'], visual_score * 1.5)
-                            
-                            # Require BOTH high skin percentage and high visual score for NSFW
-                            if skin_percentage > 60 and visual_score > 0.6:
-                                result['is_nsfw'] = True
-                                result['confidence'] = max(result['confidence'], 0.9)
-                                result['details']['reason'] = 'Visual analysis indicates NSFW content'
-                            # If visual analysis strongly suggests SFW
-                            elif visual_score < 0.2 and skin_percentage < 10:
-                                result['is_nsfw'] = False
-                                result['confidence'] = max(result['confidence'], 0.8)
-                                result['details']['reason'] = 'Visual analysis confirms SFW content'
-            
-            elif result['file_type'] == 'video':
-                # First check video metadata
-                video_analysis = self.analyze_video_metadata(file_path)
-                if 'error' not in video_analysis and video_analysis is not None:
-                    result['details']['video_metadata'] = video_analysis
-                    result['analysis_methods'].append('video_metadata')
-                    
-                    # Adjust score based on video properties
-                    suspicion_score = video_analysis.get('suspicion_score', 0)
-                    result['nsfw_score'] = max(result['nsfw_score'], suspicion_score)
-                
-                # If OpenCV is available, analyze video frames
-                if self.has_opencv:
-                    frame_analysis = self.analyze_video_frames(file_path, sample_count=3)
-                    if frame_analysis:
-                        result['details']['frame_analysis'] = frame_analysis
-                        result['analysis_methods'].append('frame_analysis')
-                        
-                        # Check if any sampled frame indicates NSFW content
-                        nsfw_frames = [f for f in frame_analysis if f.get('is_nsfw', False)]
-                        nsfw_confidence = max((f.get('nsfw_score', 0) for f in frame_analysis), default=0)
-                        
-                        if nsfw_frames and nsfw_confidence > 0.7:
-                            result['is_nsfw'] = True
-                            result['confidence'] = max(result['confidence'], nsfw_confidence)
-                            result['nsfw_score'] = max(result['nsfw_score'], nsfw_confidence)
-                            result['details']['reason'] = f'NSFW content detected in {len(nsfw_frames)} frames (max confidence: {nsfw_confidence:.2f})'
-        except Exception as e:
-            result['details']['analysis_error'] = str(e)
-            print(f"Error occurred during analysis: {e}")
+        # Content analysis is now complete - proceed to decision logic
 
         # PHASE 2: CONTENT-FIRST DECISION LOGIC
         # Content analysis confidence determines how much we trust it
