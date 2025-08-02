@@ -30,11 +30,30 @@ class RobustContentClassifier:
         
         # NSFW indicators for filename analysis
         self.nsfw_keywords = {
-            'explicit': ['porn', 'xxx', 'sex', 'nude', 'naked', 'nsfw', 'adult', 'erotic'],
-            'body_parts': ['boobs', 'tits', 'ass', 'dick', 'cock', 'pussy', 'vagina', 'penis'],
-            'actions': ['fuck', 'fucking', 'cumshot', 'cum', 'orgasm', 'masturbat', 'blowjob'],
-            'sites': ['pornhub', 'xvideos', 'xhamster', 'redtube', 'youporn', 'onlyfans'],
-            'categories': ['milf', 'teen', 'bdsm', 'fetish', 'anal', 'oral', 'lesbian', 'gay']
+            'explicit': [
+                'porn', 'xxx', 'sex', 'nude', 'naked', 'nsfw', 'adult', 'erotic',
+                'bbc', 'interracial', 'creampie', 'orgy', 'gangbang', 'threesome',
+                'cum', 'cumshot', 'facial', 'deepthroat', 'hardcore', 'softcore', 'amateur',
+                'blacked', 'pawg', 'casting', 'taboo', 'incest', 'cuckold', 'swinger', 'dp',
+                'double penetration', 'spitroast', 'gape', 'slut', 'whore', 'escort'
+            ],
+            'body_parts': [
+                'boobs', 'tits', 'ass', 'booty', 'dick', 'cock', 'pussy', 'vagina', 'penis',
+                'clit', 'anus', 'butt', 'nipples', 'testicles', 'balls', 'cum', 'load'
+            ],
+            'actions': [
+                'fuck', 'fucking', 'cumshot', 'cum', 'orgasm', 'masturbat', 'blowjob',
+                'suck', 'lick', 'ride', 'spank', 'pegging', 'strapon', 'fisting', 'teabag',
+                'rimming', '69', 'doggystyle', 'missionary', 'cowgirl', 'reverse cowgirl'
+            ],
+            'sites': [
+                'pornhub', 'xvideos', 'xhamster', 'redtube', 'youporn', 'onlyfans', 'brazzers',
+                'bangbros', 'naughtyamerica', 'realitykings', 'evilangel', 'teamskeet', 'spankbang'
+            ],
+            'categories': [
+                'milf', 'teen', 'bdsm', 'fetish', 'anal', 'oral', 'lesbian', 'gay',
+                'ebony', 'latina', 'asian', 'bbw', 'pawg', 'amateur', 'public', 'voyeur', 'exhibitionist'
+            ]
         }
         
         # SFW indicators (override NSFW detection)
