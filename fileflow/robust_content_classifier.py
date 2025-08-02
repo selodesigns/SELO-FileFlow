@@ -152,19 +152,24 @@ class RobustContentClassifier:
             'indicators': []
         }
         
+        nsfw_matched = False
         for category, keywords in self.nsfw_keywords.items():
             for keyword in keywords:
                 if keyword in filename or any(keyword in d for d in parent_dirs):
+                    nsfw_matched = True
                     result['is_explicit'] = True
-                    result['confidence'] = 0.7
+                    result['confidence'] = 0.95
                     result['reason'] = f"NSFW term ({category}): {keyword}"
                     result['indicators'].append((keyword, category))
         
-        for keyword in self.sfw_indicators:
-            if keyword in filename or any(keyword in d for d in parent_dirs):
-                result['is_sfw'] = True
-                result['confidence'] = 0.9
-                result['reason'] = f"SFW indicator: {keyword}"
+        if not nsfw_matched:
+            for keyword in self.sfw_indicators:
+                if keyword in filename or any(keyword in d for d in parent_dirs):
+                    result['is_sfw'] = True
+                    result['confidence'] = 0.9
+                    result['reason'] = f"SFW indicator: {keyword}"
+        else:
+            result['is_sfw'] = False
         
         return result
     
@@ -804,15 +809,12 @@ class RobustContentClassifier:
         if 'filename_analysis' not in result['analysis_methods']:
             result['analysis_methods'].append('filename_analysis')
         
-        # 2. If filename is explicitly NSFW, return immediately with high confidence
-        if filename_analysis.get('is_explicit', False):
-            result['is_nsfw'] = True
-            result['confidence'] = 0.99
-            result['nsfw_score'] = 0.99
+        # 2. If filename is explicitly NSFW, set flag but do NOT return; always perform content analysis
+        filename_is_explicit = filename_analysis.get('is_explicit', False)
+        if filename_is_explicit:
             result['details']['reason'] = f'Explicit filename detected: {filename_analysis["reason"]}'
             result['analysis_methods'].append('explicit_filename')
-            return result  # Skip further analysis for explicit filenames
-            
+        
         # 3. If filename is explicitly SFW, trust it unless content strongly suggests otherwise
         if filename_analysis.get('is_sfw', False):
             result['is_nsfw'] = False
