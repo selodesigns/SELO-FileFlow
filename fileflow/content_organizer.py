@@ -95,7 +95,49 @@ class ContentOrganizer:
             dest_dir = config['destination_directories'].get(category, config['destination_directories']['other'])
         
         return Path(dest_dir).expanduser()
-    
+
+    def _organize_file(self, item: Path, config: Dict, notify: bool, notify_nsfw: bool) -> Dict:
+        dest_dir = self.get_destination_path(item, config)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_dir / item.name
+        counter = 1
+        original_dest = dest_file
+        while dest_file.exists():
+            stem = original_dest.stem
+            suffix = original_dest.suffix
+            dest_file = dest_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+        classify_candidate = self.classifier.should_classify_file(item)
+        shutil.move(str(item), str(dest_file))
+        logger.info(f"Moved {item.name} -> {dest_file}")
+        classification = None
+        content_type = 'other'
+        if classify_candidate:
+            classification = self.classifier.classify_media_file(dest_file)
+            content_type = classification if classification in ('sfw', 'nsfw') else 'other'
+            if notify and (content_type != 'nsfw' or notify_nsfw):
+                content_label = content_type.upper()
+                send_notification(
+                    f"FileFlow: {content_label} File Moved",
+                    f"{dest_file.name} → {dest_dir.name}"
+                )
+        elif notify:
+            send_notification("FileFlow: File Moved", f"{dest_file.name} → {dest_dir.name}")
+        return {
+            'content_key': content_type,
+            'classification': classification or content_type,
+            'destination': dest_file
+        }
+
+    def organize_path(self, file_path: Path, config: Dict = None) -> str:
+        path = Path(file_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Source file does not exist: {path}")
+        active_config = config or self.get_enhanced_config()
+        notify = active_config.get('notify_on_move', True)
+        notify_nsfw = active_config.get('content_classification', {}).get('notify_nsfw_moves', False)
+        return self._organize_file(path, active_config, notify, notify_nsfw)
+
     def organize_files(self):
         """Organize files with content-based separation."""
         config = self.get_enhanced_config()
@@ -116,43 +158,15 @@ class ContentOrganizer:
             for item in src_path.iterdir():
                 if item.is_file():
                     try:
-                        # Get destination path
-                        dest_dir = self.get_destination_path(item, config)
-                        dest_dir.mkdir(parents=True, exist_ok=True)
-                        dest_file = dest_dir / item.name
-                        
-                        # Handle file name conflicts
-                        counter = 1
-                        original_dest = dest_file
-                        while dest_file.exists():
-                            stem = original_dest.stem
-                            suffix = original_dest.suffix
-                            dest_file = dest_dir / f"{stem}_{counter}{suffix}"
-                            counter += 1
-                        
-                        # Move the file
-                        shutil.move(str(item), str(dest_file))
-                        logger.info(f"Moved {item.name} -> {dest_file}")
-                        
-                        # Determine content type for statistics
-                        if self.classifier.should_classify_file(item):
-                            content_type = self.classifier.classify_media_file(item)
-                            moved_files[content_type] += 1
-                            
-                            # Send notification (respecting privacy settings)
-                            if notify and (content_type != 'nsfw' or notify_nsfw):
-                                content_label = content_type.upper()
-                                send_notification(
-                                    f"FileFlow: {content_label} File Moved",
-                                    f"{item.name} → {dest_dir.name}"
-                                )
+                        result = self._organize_file(item, config, notify, notify_nsfw)
+                        content_key = result.get('content_key', 'other') if result else 'other'
+                        if content_key in moved_files:
+                            moved_files[content_key] += 1
                         else:
                             moved_files['other'] += 1
-                            if notify:
-                                send_notification("FileFlow: File Moved", f"{item.name} → {dest_dir.name}")
-                        
                     except Exception as e:
                         logger.error(f"Failed to move {item}: {e}")
+                        moved_files['other'] += 1
         
         # Log summary
         total_moved = sum(moved_files.values())

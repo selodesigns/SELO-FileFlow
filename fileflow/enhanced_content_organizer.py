@@ -164,7 +164,66 @@ class EnhancedContentOrganizer:
 
         return dest_dir, classification_result
 
-    
+
+    def _process_item(self, item: Path, config: Dict, notify: bool, notify_nsfw: bool, analysis_stats: Dict = None, cli_feedback: bool = False):
+        import os
+        import sys
+        dest_dir, classification = self.get_destination_path(item, config)
+        if item.parent == dest_dir:
+            return None
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_dir / item.name
+        counter = 1
+        original_dest = dest_file
+        while dest_file.exists():
+            stem = original_dest.stem
+            suffix = original_dest.suffix
+            dest_file = dest_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+        shutil.move(str(item), str(dest_file))
+        content_key = 'nsfw' if classification.get('is_nsfw') else 'sfw'
+        if classification.get('is_nsfw'):
+            logger.info(f"NSFW: {item.name} -> {dest_file} ({classification.get('method')}: {classification.get('final_decision_reason', 'N/A')})")
+        else:
+            logger.info(f"SFW: {item.name} -> {dest_file}")
+        if analysis_stats is not None:
+            method = classification.get('method', 'other')
+            if method in analysis_stats:
+                analysis_stats[method] += 1
+            else:
+                analysis_stats['other'] = analysis_stats.get('other', 0) + 1
+        if cli_feedback:
+            method = classification.get('method', 'unknown')
+            confidence = classification.get('confidence', 0)
+            cat = 'NSFW' if classification.get('is_nsfw') else 'SFW'
+            print(f"[FileFlow] Moved {item} to {dest_file} [{cat}, {method}, confidence: {confidence:.2f}]")
+        if notify and not (os.environ.get('SSH_CONNECTION') or not sys.stdout.isatty()):
+            if not classification.get('is_nsfw') or notify_nsfw:
+                content_label = 'NSFW' if classification.get('is_nsfw') else 'SFW'
+                confidence = classification.get('confidence', 0)
+                try:
+                    send_notification(
+                        f"FileFlow: {content_label} File Moved",
+                        f"{item.name} → {dest_dir.name} (confidence: {confidence:.1f})"
+                    )
+                except Exception:
+                    pass
+        return {'content_key': content_key, 'classification': classification, 'destination': dest_file}
+
+
+    def organize_path(self, file_path: Path, config: Dict = None):
+        path = Path(file_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Source file does not exist: {path}")
+        active_config = config or self.get_enhanced_config()
+        notify = active_config.get('notify_on_move', True)
+        notify_nsfw = active_config.get('content_classification', {}).get('notify_nsfw_moves', False)
+        result = self._process_item(path, active_config, notify, notify_nsfw)
+        if result is None:
+            return {'content_key': 'other', 'classification': {}, 'destination': path}
+        return result
+
+
     def organize_files(self):
         """Organize files with enhanced content-based separation."""
         import sys
@@ -174,7 +233,7 @@ class EnhancedContentOrganizer:
         notify_nsfw = config.get('content_classification', {}).get('notify_nsfw_moves', False)
         
         moved_files = {'sfw': 0, 'nsfw': 0, 'other': 0}
-        analysis_stats = {'filename_only': 0, 'visual_only': 0, 'filename+visual': 0, 'visual_override': 0}
+        analysis_stats = {'filename_only': 0, 'visual_only': 0, 'filename+visual': 0, 'visual_override': 0, 'other': 0}
         
         is_cli = hasattr(sys, 'ps1') is False and sys.stdout.isatty()
         if is_cli:
@@ -204,47 +263,9 @@ class EnhancedContentOrganizer:
                             print(f"[FileFlow] Skipped protected/system file: {item}")
                         continue
                     try:
-                        dest_dir, classification = self.get_destination_path(item, config)
-                        dest_dir.mkdir(parents=True, exist_ok=True)
-                        dest_file = dest_dir / item.name
-                        # Handle file name conflicts
-                        counter = 1
-                        original_dest = dest_file
-                        while dest_file.exists():
-                            stem = original_dest.stem
-                            suffix = original_dest.suffix
-                            dest_file = dest_dir / f"{stem}_{counter}{suffix}"
-                            counter += 1
-                        shutil.move(str(item), str(dest_file))
-                        if classification['is_nsfw']:
-                            logger.info(f"NSFW: {item.name} -> {dest_file} ({classification['method']}: {classification.get('final_decision_reason', 'N/A')})")
-                            moved_files['nsfw'] += 1
-                        else:
-                            logger.info(f"SFW: {item.name} -> {dest_file}")
-                            moved_files['sfw'] += 1
-                        # Update analysis statistics
-                        method = classification.get('method', 'other')
-                        if method in analysis_stats:
-                            analysis_stats[method] += 1
-                        # CLI feedback
-                        if is_cli:
-                            method = classification.get('method', 'unknown')
-                            confidence = classification.get('confidence', 0)
-                            cat = 'NSFW' if classification.get('is_nsfw') else 'SFW'
-                            print(f"[FileFlow] Moved {item} to {dest_file} [{cat}, {method}, confidence: {confidence:.2f}]")
-                        # Disable all notifications in CLI/SSH mode
-                        import os
-                        if notify and not (os.environ.get('SSH_CONNECTION') or not sys.stdout.isatty()):
-                            if not classification['is_nsfw'] or notify_nsfw:
-                                content_label = 'NSFW' if classification['is_nsfw'] else 'SFW'
-                                confidence = classification.get('confidence', 0)
-                                try:
-                                    send_notification(
-                                        f"FileFlow: {content_label} File Moved",
-                                        f"{item.name} → {dest_dir.name} (confidence: {confidence:.1f})"
-                                    )
-                                except Exception:
-                                    pass
+                        processed = self._process_item(item, config, notify, notify_nsfw, analysis_stats, is_cli)
+                        if processed:
+                            moved_files[processed['content_key']] += 1
                     except Exception as e:
                         logger.error(f"Failed to move {item}: {e}")
                         moved_files['other'] += 1
