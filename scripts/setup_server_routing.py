@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+from fileflow.config import ensure_config_dir, load_config, save_config
+
+SERVER_ROOT = Path('/mnt/server')
+SOURCE_DIR = Path('/home/sean/Downloads')
+DESTINATIONS = {
+    'images': SERVER_ROOT / 'Photos',
+    'videos': SERVER_ROOT / 'Videos',
+    'documents': SERVER_ROOT / 'Documents',
+    'music': Path.home() / 'Music',
+    'archives': SERVER_ROOT / 'Installations',
+    'software': SERVER_ROOT / 'Installations',
+    'other': SERVER_ROOT / 'Photos',
+}
+
+
+def main() -> None:
+    ensure_config_dir()
+    config = load_config() or {}
+    config['source_directories'] = [str(SOURCE_DIR)]
+    config.setdefault('destination_directories', {})
+    SOURCE_DIR.mkdir(parents=True, exist_ok=True)
+    for key, path in DESTINATIONS.items():
+        path.mkdir(parents=True, exist_ok=True)
+        config['destination_directories'][key] = str(path)
+    save_config(config)
+
+
+if __name__ == '__main__':
+    main()
