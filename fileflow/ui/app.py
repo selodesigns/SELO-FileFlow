@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QEvent
 import subprocess
 import os
 from ..config import load_config, save_config, CONFIG_FILE
-from ..organizer import organize_files, reorganize_existing_files
+from ..organizer import organize_files, reorganize_existing_files, organize_path
 
 ICON_PATH = Path(__file__).parent.parent / 'data' / 'icons' / 'fileflow.png'
 
@@ -1124,11 +1124,10 @@ class FileFlowMainWindow(QMainWindow):
         # Progress dialog for file organization
         from PyQt5.QtCore import QThread, pyqtSignal, QObject
         from PyQt5.QtWidgets import QProgressDialog
-        import time
 
         class Worker(QObject):
             progress = pyqtSignal(int, int)
-            finished = pyqtSignal()
+            finished = pyqtSignal(bool)
             error = pyqtSignal(str)
 
             def __init__(self, files):
@@ -1143,15 +1142,15 @@ class FileFlowMainWindow(QMainWindow):
                 total = len(self.files)
                 for idx, f in enumerate(self.files, 1):
                     if self._abort:
+                        self.finished.emit(False)
                         return
                     try:
-                        # Simulate file organization (replace with real logic)
-                        time.sleep(0.05)
+                        organize_path(f)
                     except Exception as e:
                         self.error.emit(str(e))
                         return
                     self.progress.emit(idx, total)
-                self.finished.emit()
+                self.finished.emit(True)
 
         # Gather files to process (simulate for now)
         import os
@@ -1173,16 +1172,31 @@ class FileFlowMainWindow(QMainWindow):
         worker = Worker(files)
         worker.moveToThread(thread)
         worker.progress.connect(lambda i, t: progress_dialog.setValue(i))
-        worker.error.connect(lambda msg: QMessageBox.critical(self, 'SELO FileFlow', f'Error: {msg}'))
-        worker.finished.connect(lambda: progress_dialog.setValue(len(files)))
-        worker.finished.connect(lambda: QMessageBox.information(self, 'SELO FileFlow', 'Files organized successfully.'))
-        worker.finished.connect(thread.quit)
+        
+        def handle_finished(success):
+            if success:
+                progress_dialog.setValue(len(files))
+                QMessageBox.information(self, 'SELO FileFlow', 'Files organized successfully.')
+                self.statusbar.showMessage('Organization complete', 3000)
+            else:
+                progress_dialog.cancel()
+                self.statusbar.showMessage('Organization cancelled', 3000)
+            progress_dialog.close()
+
+        def handle_error(message):
+            progress_dialog.cancel()
+            QMessageBox.critical(self, 'SELO FileFlow', f'Error: {message}')
+            self.statusbar.showMessage('Organization failed', 3000)
+
+        worker.error.connect(handle_error)
+        worker.error.connect(lambda _: thread.quit())
+        worker.finished.connect(handle_finished)
+        worker.finished.connect(lambda _: thread.quit())
         progress_dialog.canceled.connect(worker.abort)
         thread.started.connect(worker.run)
         thread.finished.connect(thread.deleteLater)
         thread.start()
         progress_dialog.exec_()
-        self.statusbar.showMessage('Organization complete', 3000)
 
     def save_classification_settings(self):
         """Save content classification settings to config."""
