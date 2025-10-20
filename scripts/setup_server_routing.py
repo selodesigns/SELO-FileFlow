@@ -12,7 +12,7 @@ DESTINATIONS = {
     'music': Path.home() / 'Music',
     'archives': SERVER_ROOT / 'Installations',
     'software': SERVER_ROOT / 'Installations',
-    'other': SERVER_ROOT / 'Photos',
+    'other': SERVER_ROOT / 'Miscellaneous',
 }
 
 
