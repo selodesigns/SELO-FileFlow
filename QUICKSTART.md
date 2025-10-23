@@ -4,18 +4,36 @@
 
 ### 1. Clone or Download
 
+**Linux/macOS:**
 ```bash
 git clone https://github.com/selodesigns/SELO-FileFlow.git
 cd SELO-FileFlow/selo-fileflow
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/selodesigns/SELO-FileFlow.git
+cd SELO-FileFlow\selo-fileflow
 ```
 
 Or download and extract the ZIP file, then navigate to the `selo-fileflow` directory.
 
 ### 2. Run the Installer
 
+**Linux/macOS:**
 ```bash
 chmod +x install.sh
 ./install.sh
+```
+
+**Windows (PowerShell - Recommended):**
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+**Windows (Command Prompt):**
+```cmd
+install.bat
 ```
 
 The installer will:
@@ -34,20 +52,43 @@ The installer will:
 After installation, you'll be prompted to choose:
 
 **Option 1: Web UI** (Recommended)
+
+Linux/macOS:
 ```bash
 ./launch-web.sh
 ```
+
+Windows:
+```cmd
+launch-web.bat
+```
+
 Then open your browser to: **http://localhost:5173**
 
 **Option 2: Desktop UI**
+
+Linux/macOS:
 ```bash
 ./launch-desktop.sh
 ```
+
+Windows:
+```cmd
+launch-desktop.bat
+```
+
 A native desktop window will appear.
 
 **Option 3: Command Line**
+
+Linux/macOS:
 ```bash
 ./fileflow --help
+```
+
+Windows:
+```cmd
+fileflow.bat --help
 ```
 
 ---
@@ -56,7 +97,7 @@ A native desktop window will appear.
 
 ### Web Interface (Easiest)
 
-1. **Launch**: `./launch-web.sh`
+1. **Launch**: `./launch-web.sh` (Linux/macOS) or `launch-web.bat` (Windows)
 2. **Open browser**: http://localhost:5173
 3. **Configure**:
    - Add source directories (e.g., Downloads folder)
@@ -67,13 +108,14 @@ A native desktop window will appear.
 
 ### Desktop Interface
 
-1. **Launch**: `./launch-desktop.sh`
+1. **Launch**: `./launch-desktop.sh` (Linux/macOS) or `launch-desktop.bat` (Windows)
 2. **Configure** folders in the UI
 3. **Click "Organize"**
 4. **Done!**
 
 ### Command Line
 
+**Linux/macOS:**
 ```bash
 # Organize files once
 ./fileflow --organize-once
@@ -89,6 +131,24 @@ A native desktop window will appear.
 
 # Launch desktop UI
 ./fileflow --ui
+```
+
+**Windows:**
+```cmd
+REM Organize files once
+fileflow.bat --organize-once
+
+REM Start automatic file watcher
+fileflow.bat --watch
+
+REM Reorganize with NSFW classification
+fileflow.bat --reorganize
+
+REM Launch web interface
+fileflow.bat --web
+
+REM Launch desktop UI
+fileflow.bat --ui
 ```
 
 ---
@@ -147,34 +207,64 @@ Your configuration is also saved at:
 ### Installation Failed
 
 **Python not found:**
-```bash
-# Ubuntu/Debian
-sudo apt install python3 python3-pip
 
-# macOS
+Linux (Ubuntu/Debian):
+```bash
+sudo apt install python3 python3-pip
+```
+
+macOS:
+```bash
 brew install python3
 ```
 
+Windows:
+- Download from https://www.python.org/downloads/
+- Run installer and **check "Add Python to PATH"**
+- Restart Command Prompt/PowerShell
+
 **Node.js not found** (for web UI):
+
+Linux (Ubuntu/Debian):
 ```bash
-# Ubuntu/Debian
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+```
 
-# macOS
+macOS:
+```bash
 brew install node
 ```
+
+Windows:
+- Download from https://nodejs.org/
+- Run installer (LTS version recommended)
+- Restart Command Prompt/PowerShell
 
 ### Web UI Won't Start
 
 1. Check if port 9001 is in use:
+   
+   Linux/macOS:
    ```bash
    lsof -i :9001
    ```
+   
+   Windows (PowerShell):
+   ```powershell
+   Get-NetTCPConnection -LocalPort 9001
+   ```
 
 2. Use a different port:
+   
+   Linux/macOS:
    ```bash
    python3 -m fileflow.main --web --port 9002
+   ```
+   
+   Windows:
+   ```cmd
+   python -m fileflow.main --web --port 9002
    ```
 
 3. Update Vite proxy in `web/vite.config.ts` to match
@@ -182,16 +272,31 @@ brew install node
 ### Desktop UI Won't Start
 
 Install PyQt5:
+
+Linux/macOS:
 ```bash
+pip install --user PyQt5
+```
+
+Windows:
+```cmd
 pip install --user PyQt5
 ```
 
 ### Services Not Stopping
 
 Press `Ctrl+C` in the terminal, or:
+
+Linux/macOS:
 ```bash
 pkill -f "fileflow.main"
 pkill -f "vite"
+```
+
+Windows (PowerShell):
+```powershell
+Stop-Process -Name python -Force
+Stop-Process -Name node -Force
 ```
 
 ---

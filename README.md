@@ -11,6 +11,7 @@
 
 ## 🚀 3-Step Installation
 
+**Linux/macOS:**
 ```bash
 # 1. Clone the repository
 git clone https://github.com/selodesigns/SELO-FileFlow.git
@@ -24,6 +25,21 @@ chmod +x install.sh
 ./launch-web.sh          # Web UI (recommended)
 # OR
 ./launch-desktop.sh      # Desktop UI
+```
+
+**Windows:**
+```powershell
+# 1. Clone the repository
+git clone https://github.com/selodesigns/SELO-FileFlow.git
+cd SELO-FileFlow\selo-fileflow
+
+# 2. Run the installer (PowerShell)
+powershell -ExecutionPolicy Bypass -File install.ps1
+
+# 3. Launch FileFlow
+launch-web.bat           # Web UI (recommended)
+# OR
+launch-desktop.bat       # Desktop UI
 ```
 
 **That's it!** See **[QUICKSTART.md](QUICKSTART.md)** for detailed usage guide.
@@ -64,7 +80,7 @@ chmod +x install.sh
 - **Parallel Processing**: Multi-threaded analysis for faster batch operations
 - **Memory Efficient**: Optimized for large media collections
 - **Error Recovery**: Robust handling of corrupted or unusual files
-- **Cross-Platform**: Linux-native with Windows/macOS compatibility
+- **Cross-Platform**: Full support for Linux, Windows, and macOS
 
 ---
 
@@ -286,6 +302,7 @@ python3 verify_installation.py
 ## 📚 Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)**: 3-step installation and usage
+- **[Windows Guide](WINDOWS.md)**: Complete Windows setup and troubleshooting
 - **[Web UI Guide](WEB_UI_GUIDE.md)**: Complete web interface documentation
 - **[User Guide](USER_GUIDE.md)**: Comprehensive usage documentation
 - **[Installation Guide](INSTALLATION.md)**: Detailed setup instructions
