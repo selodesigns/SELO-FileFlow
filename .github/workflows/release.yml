@@ -1,0 +1,144 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build:
+    name: Build Release Archives
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version info
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip rsync
+      
+      - name: Make build script executable
+        run: chmod +x scripts/build-release.sh
+      
+      - name: Build release archives
+        run: |
+          ./scripts/build-release.sh ${{ steps.get_version.outputs.version }} all
+      
+      - name: List generated archives
+        run: |
+          echo "Generated archives:"
+          ls -lh dist/
+          echo ""
+          echo "Checksums:"
+          cat dist/checksums.txt
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-archives
+          path: dist/*
+          retention-days: 30
+      
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          # Extract version-specific notes from CHANGELOG.md if it exists
+          if [ -f "CHANGELOG.md" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            sed -n "/## \[${{ steps.get_version.outputs.version }}\]/,/## \[/p" CHANGELOG.md | head -n -1 >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes=Release ${{ steps.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: FileFlow ${{ steps.get_version.outputs.version }}
+          body: |
+            # FileFlow ${{ steps.get_version.outputs.version }}
+            
+            ## 📦 Downloads
+            
+            Choose the archive for your platform:
+            
+            - **Linux**: `fileflow-${{ steps.get_version.outputs.version }}-linux.tar.gz`
+            - **Windows**: `fileflow-${{ steps.get_version.outputs.version }}-windows.zip`
+            - **macOS**: `fileflow-${{ steps.get_version.outputs.version }}-macos.tar.gz`
+            - **Source**: `fileflow-${{ steps.get_version.outputs.version }}-source.tar.gz`
+            
+            ## 🚀 Installation
+            
+            1. Download the archive for your platform
+            2. Extract the archive
+            3. Run the installation script:
+               - Linux/macOS: `./install.sh`
+               - Windows: `install.bat` or `install.ps1`
+            4. Launch the application:
+               - Web UI: `./launch-web.sh` (Linux/macOS) or `launch-web.bat` (Windows)
+               - Desktop UI: `./launch-desktop.sh` (Linux/macOS) or `launch-desktop.bat` (Windows)
+            
+            ## 📖 Documentation
+            
+            - [Quick Start Guide](https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/QUICKSTART.md)
+            - [User Guide](https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/USER_GUIDE.md)
+            - [Web UI Guide](https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/WEB_UI_GUIDE.md)
+            - [Windows Guide](https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/WINDOWS.md)
+            
+            ## 🔐 Checksums
+            
+            Verify your download integrity using the included `checksums.txt` file.
+            
+            ## 💬 Support
+            
+            - Report issues: [GitHub Issues](https://github.com/selodesigns/SELO-FileFlow/issues)
+            - Documentation: [Repository](https://github.com/selodesigns/SELO-FileFlow)
+            
+            ---
+            
+            ${{ steps.release_notes.outputs.notes }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update latest release links
+        if: success()
+        run: |
+          echo "Release created successfully!"
+          echo ""
+          echo "Direct download links:"
+          echo "https://github.com/selodesigns/SELO-FileFlow/releases/download/${{ steps.get_version.outputs.version }}/fileflow-${{ steps.get_version.outputs.version }}-linux.tar.gz"
+          echo "https://github.com/selodesigns/SELO-FileFlow/releases/download/${{ steps.get_version.outputs.version }}/fileflow-${{ steps.get_version.outputs.version }}-windows.zip"
+          echo "https://github.com/selodesigns/SELO-FileFlow/releases/download/${{ steps.get_version.outputs.version }}/fileflow-${{ steps.get_version.outputs.version }}-macos.tar.gz"
+          echo ""
+          echo "Update your website download links with these URLs!"

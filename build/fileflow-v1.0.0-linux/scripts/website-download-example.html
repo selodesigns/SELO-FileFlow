@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileFlow Download - Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 50px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .version {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+        }
+        
+        .description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+        
+        .downloads {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .download-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .download-card:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .download-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .download-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .download-btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .download-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .info-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .info-section code {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .checksums {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Download FileFlow</h1>
+        <div class="version">
+            Latest Version: <span id="version">Loading...</span>
+        </div>
+        <p class="description">
+            FileFlow is a powerful, cross-platform file organization system with AI-powered content classification.
+            Choose your platform below to get started.
+        </p>
+        
+        <div class="downloads">
+            <div class="download-card">
+                <div class="download-icon">🐧</div>
+                <div class="download-title">Linux</div>
+                <a href="#" id="linux-download" class="download-btn">Download</a>
+            </div>
+            
+            <div class="download-card">
+                <div class="download-icon">🪟</div>
+                <div class="download-title">Windows</div>
+                <a href="#" id="windows-download" class="download-btn">Download</a>
+            </div>
+            
+            <div class="download-card">
+                <div class="download-icon">🍎</div>
+                <div class="download-title">macOS</div>
+                <a href="#" id="macos-download" class="download-btn">Download</a>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h3>📖 Quick Start</h3>
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li>Download the archive for your platform</li>
+                <li>Extract the archive</li>
+                <li>Run installation: <code>./install.sh</code> (Linux/macOS) or <code>install.bat</code> (Windows)</li>
+                <li>Launch Web UI: <code>./launch-web.sh</code> or <code>launch-web.bat</code></li>
+                <li>Open <code>http://localhost:5173</code> in your browser</li>
+            </ol>
+        </div>
+        
+        <div class="info-section">
+            <h3>🔐 Verify Download</h3>
+            <p>Download includes <code>checksums.txt</code> for verifying file integrity.</p>
+            <div class="checksums">
+                <strong>Linux/macOS:</strong> <code>sha256sum -c checksums.txt</code><br>
+                <strong>Windows:</strong> <code>certutil -hashfile filename.zip SHA256</code>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h3>📚 Documentation</h3>
+            <p>
+                <a href="https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/QUICKSTART.md" style="color: #667eea;">Quick Start Guide</a> •
+                <a href="https://github.com/selodesigns/SELO-FileFlow/blob/main/selo-fileflow/USER_GUIDE.md" style="color: #667eea;">User Guide</a> •
+                <a href="https://github.com/selodesigns/SELO-FileFlow" style="color: #667eea;">GitHub Repository</a>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Fetch latest release info from GitHub API
+        const GITHUB_REPO = 'selodesigns/SELO-FileFlow';
+        const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+        
+        async function loadLatestRelease() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                // Update version display
+                document.getElementById('version').textContent = data.tag_name;
+                
+                // Update download links
+                const baseUrl = `https://github.com/${GITHUB_REPO}/releases/download/${data.tag_name}`;
+                document.getElementById('linux-download').href = `${baseUrl}/fileflow-${data.tag_name}-linux.tar.gz`;
+                document.getElementById('windows-download').href = `${baseUrl}/fileflow-${data.tag_name}-windows.zip`;
+                document.getElementById('macos-download').href = `${baseUrl}/fileflow-${data.tag_name}-macos.tar.gz`;
+                
+                console.log('Latest release loaded:', data.tag_name);
+            } catch (error) {
+                console.error('Error loading release info:', error);
+                document.getElementById('version').textContent = 'Check GitHub';
+                
+                // Fallback to latest release URL
+                const fallbackUrl = `https://github.com/${GITHUB_REPO}/releases/latest`;
+                document.getElementById('linux-download').href = fallbackUrl;
+                document.getElementById('windows-download').href = fallbackUrl;
+                document.getElementById('macos-download').href = fallbackUrl;
+            }
+        }
+        
+        // Load on page load
+        loadLatestRelease();
+    </script>
+</body>
+</html>

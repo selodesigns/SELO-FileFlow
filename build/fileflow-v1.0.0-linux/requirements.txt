@@ -1,0 +1,43 @@
+# FileFlow Enhanced Content Classification System
+# Core dependencies for basic functionality
+pyyaml>=5.4.0
+watchdog>=2.0.0
+PyQt5>=5.15.0
+pytest>=6.0.0
+
+# Web API dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
+# Enhanced content analysis dependencies
+# Computer vision and image processing for visual content analysis
+opencv-python>=4.5.0
+Pillow>=8.0.0
+numpy>=1.20.0
+
+# System-level dependencies (install separately):
+# =============================================
+# For comprehensive EXIF metadata extraction:
+#   Ubuntu/Debian: sudo apt install libimage-exiftool-perl
+#   macOS: brew install exiftool
+#   Windows: Download from https://exiftool.org/
+#
+# For video metadata analysis:
+#   Ubuntu/Debian: sudo apt install ffmpeg
+#   macOS: brew install ffmpeg
+#   Windows: Download from https://ffmpeg.org/
+
+# Optional performance enhancements
+# pillow-simd>=8.0.0  # Faster SIMD-accelerated Pillow (optional replacement for Pillow)
+
+# Future ML-based classification (not yet implemented)
+# tensorflow>=2.8.0
+# torch>=1.11.0
+# transformers>=4.18.0
+# scikit-learn>=1.0.0
+
+# Development and testing dependencies
+# pytest-cov>=3.0.0  # For test coverage reports
+# black>=22.0.0       # Code formatting
+# flake8>=4.0.0       # Code linting
