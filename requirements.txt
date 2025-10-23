@@ -5,6 +5,11 @@ watchdog>=2.0.0
 PyQt5>=5.15.0
 pytest>=6.0.0
 
+# Web API dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
 # Enhanced content analysis dependencies
 # Computer vision and image processing for visual content analysis
 opencv-python>=4.5.0

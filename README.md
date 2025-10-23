@@ -9,6 +9,27 @@
 
 > 🎯 **Perfect for**: Content creators, digital archivists, photographers, and anyone managing large mixed media collections that need intelligent content-based organization.
 
+## 🚀 3-Step Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/selodesigns/SELO-FileFlow.git
+cd SELO-FileFlow/selo-fileflow
+
+# 2. Run the installer
+chmod +x install.sh
+./install.sh
+
+# 3. Launch FileFlow
+./launch-web.sh          # Web UI (recommended)
+# OR
+./launch-desktop.sh      # Desktop UI
+```
+
+**That's it!** See **[QUICKSTART.md](QUICKSTART.md)** for detailed usage guide.
+
+---
+
 ---
 
 ## 🚀 Key Features
@@ -27,12 +48,16 @@
 - **Graceful Degradation**: Works even when optional dependencies are missing
 - **Reorganization Support**: Apply enhanced classification to existing organized files
 
-### 🎨 **Professional Interface**
-- **Modern PyQt5 GUI**: Intuitive tabbed interface with real-time feedback
-- **Content Classification Tab**: Control all advanced analysis features
-- **System Status Indicators**: Shows availability of analysis methods
-- **Progress Monitoring**: Real-time feedback during batch operations
-- **Settings Management**: Save and load custom classification configurations
+### 🎨 **Multiple Interfaces**
+- **Modern Web UI**: React-based browser interface with real-time updates (recommended)
+  - Access from anywhere at http://localhost:5173
+  - REST API with interactive Swagger docs
+  - Mobile-responsive design
+- **Desktop UI**: Native PyQt5 application with system integration
+  - Tray icon support
+  - Desktop notifications
+  - Autostart integration
+- **Command Line**: Full-featured CLI for automation and scripting
 
 ### ⚡ **Performance & Reliability**
 - **Intelligent Caching**: Speeds up repeated analysis with file hash-based caching
@@ -73,48 +98,41 @@ adult_content.mp4 → NSFW (explicit keyword detected)
 
 ---
 
-## 🚀 Quick Start
+## 🎯 Quick Start After Installation
 
-### Installation
-
-#### 🚀 **One-Command Setup** (Recommended)
+### Launch Web UI (Recommended)
 ```bash
-# Clone and auto-install everything
-git clone https://github.com/yourusername/FileFlow.git
-cd FileFlow
-./setup.sh
+./launch-web.sh
+```
+Then open http://localhost:5173 in your browser.
+
+### Launch Desktop UI
+```bash
+./launch-desktop.sh
 ```
 
-#### 📋 **Manual Installation**
+### Command Line Usage
 ```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/FileFlow.git
-cd FileFlow
+# Show all options
+./fileflow --help
 
-# 2. Run comprehensive installer
-./install.sh
+# Organize files once
+./fileflow --organize-once
 
-# 3. Launch FileFlow
-python3 -m fileflow.main --ui
+# Start auto-watcher
+./fileflow --watch
+
+# Reorganize with NSFW classification
+./fileflow --reorganize
 ```
 
-#### 🔧 **Advanced Setup**
-```bash
-# Custom installation with verification
-git clone https://github.com/yourusername/FileFlow.git
-cd FileFlow
-pip install -r requirements.txt
-sudo apt install libimage-exiftool-perl ffmpeg  # Ubuntu/Debian
-python3 verify_installation.py
-python3 -m fileflow.main --ui
-```
-
-### First-Time Setup
-1. **Configure Folders**: Add source directories with mixed content
-2. **Set Destinations**: Choose organized output locations
-3. **Enable Classification**: Go to Content Classification tab
-4. **Test & Adjust**: Try on sample files, adjust threshold
-5. **Run Organization**: Process your full collection
+### First-Time Configuration
+1. **Open the Web UI** (http://localhost:5173)
+2. **Go to Configuration tab**: Add source and destination directories
+3. **Go to File Types tab**: Customize file extensions (or use defaults)
+4. **Go to Classification tab**: Enable NSFW detection if needed
+5. **Go to Actions tab**: Click "Start Organization"
+6. **Done!** Your files are now organized
 
 ---
 
@@ -267,10 +285,11 @@ python3 verify_installation.py
 
 ## 📚 Documentation
 
-- **[Installation Guide](INSTALLATION.md)**: Detailed setup instructions
+- **[Quick Start Guide](QUICKSTART.md)**: 3-step installation and usage
+- **[Web UI Guide](WEB_UI_GUIDE.md)**: Complete web interface documentation
 - **[User Guide](USER_GUIDE.md)**: Comprehensive usage documentation
-- **[API Documentation](docs/api.md)**: Developer reference
-- **[Configuration Reference](docs/config.md)**: All settings explained
+- **[Installation Guide](INSTALLATION.md)**: Detailed setup instructions
+- **[API Documentation](http://localhost:9001/docs)**: Interactive API docs (when server is running)
 
 ---
 

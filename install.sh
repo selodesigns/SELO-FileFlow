@@ -92,6 +92,29 @@ check_python() {
     print_success "Python $PYTHON_VERSION detected (compatible)"
 }
 
+check_nodejs() {
+    print_step "Checking Node.js installation (for web UI)..."
+    
+    if ! command -v node >/dev/null 2>&1; then
+        print_warning "Node.js is not installed. Web UI will not be available."
+        print_warning "To install Node.js, visit: https://nodejs.org/"
+        HAS_NODEJS=false
+        return
+    fi
+    
+    NODE_VERSION=$(node --version | sed 's/v//')
+    NODE_MAJOR=$(echo $NODE_VERSION | cut -d. -f1)
+    
+    if [[ $NODE_MAJOR -lt 18 ]]; then
+        print_warning "Node.js $NODE_VERSION detected. Web UI requires Node.js 18+."
+        print_warning "Please upgrade Node.js for web UI support."
+        HAS_NODEJS=false
+    else
+        print_success "Node.js $NODE_VERSION detected (compatible)"
+        HAS_NODEJS=true
+    fi
+}
+
 install_system_dependencies() {
     print_step "Installing system dependencies..."
     
@@ -177,6 +200,33 @@ install_python_dependencies() {
     fi
     
     print_success "Python dependencies installed"
+}
+
+install_nodejs_dependencies() {
+    if [[ "$HAS_NODEJS" != "true" ]]; then
+        print_warning "Skipping Node.js dependencies (Node.js not available)"
+        return
+    fi
+    
+    print_step "Installing Node.js dependencies for web UI..."
+    
+    WEB_DIR="$SCRIPT_DIR/web"
+    if [[ ! -d "$WEB_DIR" ]]; then
+        print_warning "Web UI directory not found. Skipping web dependencies."
+        return
+    fi
+    
+    cd "$WEB_DIR"
+    
+    if [[ -f "package.json" ]]; then
+        print_step "Installing npm packages..."
+        npm install --silent
+        print_success "Node.js dependencies installed"
+    else
+        print_warning "package.json not found in $WEB_DIR"
+    fi
+    
+    cd "$SCRIPT_DIR"
 }
 
 verify_installation() {
@@ -318,6 +368,74 @@ EOF
     fi
 }
 
+create_launchers() {
+    print_step "Creating launcher scripts..."
+    
+    # Create desktop UI launcher
+    cat > "$SCRIPT_DIR/launch-desktop.sh" <<EOF
+#!/bin/bash
+cd "$SCRIPT_DIR"
+python3 -m fileflow.main --ui
+EOF
+    chmod +x "$SCRIPT_DIR/launch-desktop.sh"
+    print_success "Desktop launcher created: ./launch-desktop.sh"
+    
+    # Create web UI launcher if Node.js is available
+    if [[ "$HAS_NODEJS" == "true" ]]; then
+        cat > "$SCRIPT_DIR/launch-web.sh" <<EOF
+#!/bin/bash
+cd "$SCRIPT_DIR"
+
+echo "🚀 Starting FileFlow Web UI..."
+echo "================================"
+echo ""
+echo "Services:"
+echo "  • API Server: http://localhost:9001"
+echo "  • Web UI: http://localhost:5173"
+echo "  • API Docs: http://localhost:9001/docs"
+echo ""
+echo "Press Ctrl+C to stop"
+echo ""
+
+# Start API server in background
+python3 -m fileflow.main --web --host 127.0.0.1 --port 9001 &
+API_PID=\$!
+
+# Give API time to start
+sleep 2
+
+# Start frontend
+cd web
+npm run dev &
+FRONTEND_PID=\$!
+
+# Cleanup function
+cleanup() {
+    echo ""
+    echo "🛑 Stopping services..."
+    kill \$API_PID \$FRONTEND_PID 2>/dev/null || true
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+# Wait for both processes
+wait
+EOF
+        chmod +x "$SCRIPT_DIR/launch-web.sh"
+        print_success "Web launcher created: ./launch-web.sh"
+    fi
+    
+    # Create CLI helper
+    cat > "$SCRIPT_DIR/fileflow" <<EOF
+#!/bin/bash
+cd "$SCRIPT_DIR"
+python3 -m fileflow.main "\$@"
+EOF
+    chmod +x "$SCRIPT_DIR/fileflow"
+    print_success "CLI helper created: ./fileflow"
+}
+
 show_completion_message() {
     echo ""
     echo -e "${GREEN}================================${NC}"
@@ -330,22 +448,34 @@ show_completion_message() {
     echo "✅ EXIF metadata analysis"
     echo "✅ Visual content analysis"
     echo "✅ Desktop integration"
+    if [[ "$HAS_NODEJS" == "true" ]]; then
+        echo "✅ Modern web interface"
+    fi
     echo ""
-    echo -e "${BLUE}Next steps:${NC}"
-    echo "1. Launch FileFlow: ${YELLOW}python3 -m fileflow.main --ui${NC}"
-    echo "2. Configure your source and destination folders"
-    echo "3. Test classification on sample files"
-    echo "4. Run organization on your media collection"
+    echo -e "${BLUE}Quick Start:${NC}"
+    if [[ "$HAS_NODEJS" == "true" ]]; then
+        echo "• Launch Web UI: ${YELLOW}./launch-web.sh${NC}"
+        echo "  Access at: ${YELLOW}http://localhost:5173${NC}"
+        echo ""
+    fi
+    echo "• Launch Desktop UI: ${YELLOW}./launch-desktop.sh${NC}"
+    echo "• CLI Usage: ${YELLOW}./fileflow --help${NC}"
+    echo ""
+    echo -e "${BLUE}Command Examples:${NC}"
+    echo "• Organize once: ${YELLOW}./fileflow --organize-once${NC}"
+    echo "• Start watcher: ${YELLOW}./fileflow --watch${NC}"
+    echo "• Reorganize with NSFW classification: ${YELLOW}./fileflow --reorganize${NC}"
+    echo ""
+    echo -e "${BLUE}Configuration:${NC}"
+    echo "• Config file: ${YELLOW}$HOME/.config/fileflow/config.yaml${NC}"
+    echo "• Or use the web/desktop UI to configure"
     echo ""
     echo -e "${BLUE}Documentation:${NC}"
+    if [[ "$HAS_NODEJS" == "true" ]]; then
+        echo "• Web UI Guide: $SCRIPT_DIR/WEB_UI_GUIDE.md"
+    fi
     echo "• User Guide: $SCRIPT_DIR/USER_GUIDE.md"
-    echo "• Installation Guide: $SCRIPT_DIR/INSTALLATION.md"
-    echo "• Configuration: $HOME/.config/fileflow/config.yaml"
-    echo ""
-    echo -e "${BLUE}Support:${NC}"
-    echo "• Run verification: ${YELLOW}python3 verify_installation.py${NC}"
-    echo "• Check logs: $HOME/.cache/fileflow/logs/"
-    echo "• Report issues: GitHub Issues"
+    echo "• Configuration: $SCRIPT_DIR/CONFIGURATION.md"
     echo ""
 }
 
@@ -366,21 +496,48 @@ main() {
     
     check_os
     check_python
+    check_nodejs
     install_system_dependencies
     install_python_dependencies
+    install_nodejs_dependencies
     verify_installation
     create_config_directory
+    create_launchers
     setup_desktop_integration
     show_completion_message
     
     echo -e "${GREEN}Ready to launch FileFlow!${NC}"
     echo ""
-    read -p "Would you like to launch FileFlow now? (Y/n): " -n 1 -r
-    echo ""
     
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        cd "$SCRIPT_DIR"
-        python3 -m fileflow.main --ui
+    if [[ "$HAS_NODEJS" == "true" ]]; then
+        echo "Choose interface:"
+        echo "1) Web UI (modern, browser-based)"
+        echo "2) Desktop UI (PyQt, native)"
+        echo "3) Skip for now"
+        read -p "Enter choice (1-3): " -n 1 -r
+        echo ""
+        
+        case $REPLY in
+            1)
+                cd "$SCRIPT_DIR"
+                ./launch-web.sh
+                ;;
+            2)
+                cd "$SCRIPT_DIR"
+                python3 -m fileflow.main --ui
+                ;;
+            *)
+                echo "You can launch FileFlow anytime with ./launch-web.sh or ./launch-desktop.sh"
+                ;;
+        esac
+    else
+        read -p "Would you like to launch the Desktop UI now? (Y/n): " -n 1 -r
+        echo ""
+        
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            cd "$SCRIPT_DIR"
+            python3 -m fileflow.main --ui
+        fi
     fi
 }
 
